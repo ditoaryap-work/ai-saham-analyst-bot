@@ -40,8 +40,9 @@ YFINANCE_TICKER_SUFFIX = ".JK"  # Suffix JSX di Yahoo Finance
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 VPS_TIMEZONE = os.getenv("VPS_TIMEZONE", "Asia/Jakarta")
 
-# ── Saham Test (LQ45 untuk development) ──────────────────
-TEST_STOCKS = ["BBCA", "TLKM", "BMRI", "ASII", "UNVR"]
+# ── Saham Test (Bisa diubah via .env) ───────────────────
+_env_stocks = os.getenv("TEST_STOCKS", "BBCA,TLKM,BMRI,ASII,UNVR")
+TEST_STOCKS = [s.strip() for s in _env_stocks.split(",") if s.strip()]
 
 # ── Trading Rules IDX (per April 2025) ───────────────────
 # Auto Rejection Buy (ARB): flat -15%
