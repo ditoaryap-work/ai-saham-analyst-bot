@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 from datetime import date
 
-import yfinance as yf
+from yahooquery import Ticker
 from loguru import logger
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -19,7 +19,7 @@ sys.path.insert(0, str(ROOT))
 
 from config.settings import MACRO_TICKERS
 from data.database import db
-from utils.helpers import delay, get_yf_session
+from utils.helpers import delay
 
 
 def fetch_index_change(ticker_symbol: str, name: str) -> float:
@@ -28,16 +28,17 @@ def fetch_index_change(ticker_symbol: str, name: str) -> float:
     Returns: persentase perubahan (misal 0.015 = +1.5%)
     """
     try:
-        session = get_yf_session()
-        ticker = yf.Ticker(ticker_symbol, session=session)
+        ticker = Ticker(ticker_symbol, asynchronous=False)
         hist = ticker.history(period="5d")
         
-        if hist.empty or len(hist) < 2:
+        if isinstance(hist, dict) or hist.empty or len(hist) < 2:
             logger.warning(f"[{name}] Data tidak cukup untuk hitung change.")
             return 0.0
+            
+        hist = hist.reset_index()
         
-        prev_close = hist['Close'].iloc[-2]
-        last_close = hist['Close'].iloc[-1]
+        prev_close = hist['close'].iloc[-2]
+        last_close = hist['close'].iloc[-1]
         
         if prev_close == 0:
             return 0.0
