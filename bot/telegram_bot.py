@@ -160,22 +160,16 @@ async def post_init(application):
         await job_func(FakeCtx(bot_ref))
 
     # Senin-Jumat
-    scheduler.add_job(lambda: asyncio.ensure_future(_wrap(job_briefing_pagi, bot)),
-                      CronTrigger(hour=7, minute=0, day_of_week='mon-fri'), name='briefing_pagi')
-    scheduler.add_job(lambda: asyncio.ensure_future(_wrap(job_update_siang, bot)),
-                      CronTrigger(hour=12, minute=0, day_of_week='mon-fri'), name='update_siang')
-    scheduler.add_job(lambda: asyncio.ensure_future(_wrap(job_sinyal_sore, bot)),
-                      CronTrigger(hour=16, minute=15, day_of_week='mon-fri'), name='sinyal_sore')
-    scheduler.add_job(lambda: asyncio.ensure_future(_wrap(job_fetch_ohlcv, bot)),
-                      CronTrigger(hour=16, minute=30, day_of_week='mon-fri'), name='fetch_ohlcv')
+    scheduler.add_job(_wrap, trigger=CronTrigger(hour=7, minute=0, day_of_week='mon-fri'), args=[job_briefing_pagi, bot], name='briefing_pagi')
+    scheduler.add_job(_wrap, trigger=CronTrigger(hour=12, minute=0, day_of_week='mon-fri'), args=[job_update_siang, bot], name='update_siang')
+    scheduler.add_job(_wrap, trigger=CronTrigger(hour=16, minute=15, day_of_week='mon-fri'), args=[job_sinyal_sore, bot], name='sinyal_sore')
+    scheduler.add_job(_wrap, trigger=CronTrigger(hour=16, minute=30, day_of_week='mon-fri'), args=[job_fetch_ohlcv, bot], name='fetch_ohlcv')
 
     # Setiap 2 jam: fetch news
-    scheduler.add_job(lambda: asyncio.ensure_future(_wrap(job_fetch_news, bot)),
-                      CronTrigger(hour='6,8,10,12,14,16,18,20,22'), name='fetch_news')
+    scheduler.add_job(_wrap, trigger=CronTrigger(hour='6,8,10,12,14,16,18,20,22'), args=[job_fetch_news, bot], name='fetch_news')
 
     # Setiap hari: fundamental jam 22:00
-    scheduler.add_job(lambda: asyncio.ensure_future(_wrap(job_fetch_fundamental, bot)),
-                      CronTrigger(hour=22, minute=0), name='fetch_fundamental')
+    scheduler.add_job(_wrap, trigger=CronTrigger(hour=22, minute=0), args=[job_fetch_fundamental, bot], name='fetch_fundamental')
 
     scheduler.start()
     logger.info(f"⏰ Scheduler started ({len(scheduler.get_jobs())} jobs)")
