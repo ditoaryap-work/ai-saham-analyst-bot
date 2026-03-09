@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 from datetime import datetime, date
 
-from yahooquery import Ticker
+import yfinance as yf
 import pandas as pd
 from loguru import logger
 
@@ -25,7 +25,7 @@ from config.settings import (
     YFINANCE_DELAY, YFINANCE_BATCH_SIZE, YFINANCE_TICKER_SUFFIX, TEST_STOCKS
 )
 from data.database import db
-from utils.helpers import to_yf_ticker, from_yf_ticker, batch_list, delay
+from utils.helpers import to_yf_ticker, from_yf_ticker, batch_list, delay, get_yf_session
 
 
 def fetch_ohlcv(kode: str, period: str = "1y") -> pd.DataFrame:
@@ -40,19 +40,19 @@ def fetch_ohlcv(kode: str, period: str = "1y") -> pd.DataFrame:
         DataFrame dengan kolom: kode, tanggal, open, high, low, close, volume, value
     """
     ticker_symbol = to_yf_ticker(kode)
+    session = get_yf_session()
     
     try:
-        ticker = Ticker(ticker_symbol, asynchronous=False)
+        ticker = yf.Ticker(ticker_symbol, session=session)
         hist = ticker.history(period=period)
         
-        if isinstance(hist, dict) or hist.empty:
-            logger.warning(f"[{kode}] Data OHLCV kosong atau error dari yq.")
+        if hist.empty:
+            logger.warning(f"[{kode}] Data OHLCV kosong dari yfinance.")
             return pd.DataFrame()
-            
-        hist = hist.reset_index()
         
         # Bersihkan dan format data
-        df = hist[['date', 'open', 'high', 'low', 'close', 'volume']].copy()
+        df = hist[['Open', 'High', 'Low', 'Close', 'Volume']].copy()
+        df = df.reset_index()
         
         # Rename kolom
         df.columns = ['tanggal', 'open', 'high', 'low', 'close', 'volume']
@@ -103,30 +103,20 @@ def fetch_emiten_info(kode: str) -> dict:
     Returns dict untuk tabel daftar_emiten.
     """
     ticker_symbol = to_yf_ticker(kode)
+    session = get_yf_session()
     
     try:
-        ticker = Ticker(ticker_symbol, asynchronous=False)
+        ticker = yf.Ticker(ticker_symbol, session=session)
+        info = ticker.info
         
-        # Fetch data dictionary
-        price_data = ticker.price
-        profile_data = ticker.summary_profile
-        
-        # Extract for the specific symbol
-        p_info = price_data.get(ticker_symbol, {})
-        sp_info = profile_data.get(ticker_symbol, {})
-        
-        if isinstance(p_info, str): # usually means error like "No fundamental data..."
-            logger.warning(f"[{kode}] Gagal fetch info emiten dari yq: {p_info}")
-            return {}
-            
         return {
             'kode': kode.upper(),
-            'nama': p_info.get('longName') or p_info.get('shortName', kode),
-            'sektor': sp_info.get('sector', ''),
-            'subsektor': sp_info.get('industry', ''),
+            'nama': info.get('longName') or info.get('shortName', kode),
+            'sektor': info.get('sector', ''),
+            'subsektor': info.get('industry', ''),
             'papan': '',  # yfinance tidak menyediakan info papan
             'listed_date': None,
-            'market_cap': p_info.get('marketCap', 0),
+            'market_cap': info.get('marketCap', 0),
             'is_suspended': 0,
             'last_update': date.today().isoformat(),
         }

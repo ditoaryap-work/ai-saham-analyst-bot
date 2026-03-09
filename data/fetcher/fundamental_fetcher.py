@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 from datetime import date
 
-from yahooquery import Ticker
+import yfinance as yf
 import pandas as pd
 from loguru import logger
 
@@ -23,7 +23,7 @@ sys.path.insert(0, str(ROOT))
 
 from config.settings import YFINANCE_DELAY, TEST_STOCKS
 from data.database import db
-from utils.helpers import to_yf_ticker, delay
+from utils.helpers import to_yf_ticker, delay, get_yf_session
 
 
 def fetch_fundamental(kode: str) -> dict:
@@ -34,52 +34,43 @@ def fetch_fundamental(kode: str) -> dict:
     Returns dict siap insert ke tabel fundamental.
     """
     ticker_symbol = to_yf_ticker(kode)
+    session = get_yf_session()
     
     try:
-        ticker = Ticker(ticker_symbol, asynchronous=False)
+        ticker = yf.Ticker(ticker_symbol, session=session)
+        info = ticker.info
         
-        # Ambil laporan keuangan terbaru
-        income = ticker.income_statement()
-        balance = ticker.balance_sheet()
-        cashflow = ticker.cash_flow()
-        
-        info = ticker.financial_data.get(ticker_symbol, {})
-        if isinstance(info, str): info = {}
-        
-        summary = ticker.summary_detail.get(ticker_symbol, {})
-        if isinstance(summary, str): summary = {}
-        
-        key_stats = ticker.key_stats.get(ticker_symbol, {})
-        if isinstance(key_stats, str): key_stats = {}
+        # Ambil laporan keuangan terbaru (kolom pertama = terbaru)
+        income = ticker.income_stmt
+        balance = ticker.balance_sheet
+        cashflow = ticker.cashflow
         
         # Helper: ambil value dari DataFrame dengan aman
-        def safe_get(df, key):
-            """Ambil value terakhir dari financial statement DataFrame yq."""
-            if isinstance(df, dict) or df is None or df.empty:
+        def safe_get(df, key, col_idx=0):
+            """Ambil value dari financial statement DataFrame."""
+            if df is None or df.empty:
                 return None
-            if key in df.columns:
-                series = df[key].dropna()
-                if not series.empty:
-                    val = series.iloc[-1]
-                    return float(val) if pd.notna(val) else None
+            if key in df.index and col_idx < len(df.columns):
+                val = df.loc[key].iloc[col_idx]
+                return float(val) if pd.notna(val) else None
             return None
         
         # ── Dari Income Statement ────────────────────
-        revenue = safe_get(income, 'TotalRevenue')
-        net_income = safe_get(income, 'NetIncome')
-        gross_profit = safe_get(income, 'GrossProfit')
+        revenue = safe_get(income, 'Total Revenue')
+        net_income = safe_get(income, 'Net Income')
+        gross_profit = safe_get(income, 'Gross Profit')
         ebit = safe_get(income, 'EBIT')
         
         # ── Dari Balance Sheet ───────────────────────
-        total_assets = safe_get(balance, 'TotalAssets')
-        total_equity = safe_get(balance, 'StockholdersEquity') or safe_get(balance, 'CommonStockEquity')
-        total_debt = safe_get(balance, 'TotalDebt')
-        current_assets = safe_get(balance, 'CurrentAssets')
-        current_liabilities = safe_get(balance, 'CurrentLiabilities')
-        retained_earnings = safe_get(balance, 'RetainedEarnings')
+        total_assets = safe_get(balance, 'Total Assets')
+        total_equity = safe_get(balance, 'Stockholders Equity') or safe_get(balance, 'Common Stock Equity')
+        total_debt = safe_get(balance, 'Total Debt')
+        current_assets = safe_get(balance, 'Current Assets')
+        current_liabilities = safe_get(balance, 'Current Liabilities')
+        retained_earnings = safe_get(balance, 'Retained Earnings')
         
         # ── Dari Cash Flow ───────────────────────────
-        operating_cashflow = safe_get(cashflow, 'OperatingCashFlow')
+        operating_cashflow = safe_get(cashflow, 'Operating Cash Flow')
         
         # ── Kalkulasi turunan ────────────────────────
         working_capital = None
@@ -89,20 +80,18 @@ def fetch_fundamental(kode: str) -> dict:
         roa = info.get('returnOnAssets')
         roe = info.get('returnOnEquity')
         
-        der = info.get('debtToEquity')
-        if der is not None:
-             der = der / 100.0
-        elif total_debt is not None and total_equity is not None and total_equity != 0:
+        der = None
+        if total_debt is not None and total_equity is not None and total_equity != 0:
             der = total_debt / total_equity
         
-        per = summary.get('trailingPE')
-        pbv = key_stats.get('priceToBook')
-        eps = key_stats.get('trailingEps')
+        per = info.get('trailingPE')
+        pbv = info.get('priceToBook')
+        eps = info.get('trailingEps')
         
         # Periode: ambil dari kolom terbaru income statement
         periode = "latest"
-        if not isinstance(income, dict) and income is not None and not income.empty and 'asOfDate' in income.columns:
-            latest_date = income['asOfDate'].dropna().iloc[-1]
+        if income is not None and not income.empty:
+            latest_date = income.columns[0]
             periode = str(latest_date.strftime('%Y-%m-%d') if hasattr(latest_date, 'strftime') else latest_date)
         
         result = {

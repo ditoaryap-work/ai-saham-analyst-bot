@@ -1,6 +1,6 @@
 pandas>=2.2.0
 numpy>=2.0.0
-yahooquery>=2.4.1
+yfinance==0.2.58
 curl_cffi>=0.13.0
 apscheduler>=3.10.0
 requests>=2.32.0
