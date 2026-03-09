@@ -29,6 +29,13 @@ from bot.formatter import (
     format_analisa, format_portfolio, format_track_record,
 )
 
+# ── Import Fetchers untuk Admin Commands ──
+from data.fetcher.macro_fetcher import fetch_and_save_macro
+from data.fetcher.stock_fetcher import fetch_and_save_batch
+from data.fetcher.fundamental_fetcher import fetch_and_save_fundamentals
+from data.fetcher.news_fetcher import fetch_all_news, save_articles_to_db
+from ai.sentiment import process_unprocessed_news
+
 
 # ═══════════════════════════════════════════════════════
 # REPLY KEYBOARD (Menu Tombol Permanen)
@@ -132,6 +139,11 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/beli `KODE LOT HARGA` — Input beli\n"
         "/jual `KODE LOT HARGA` — Input jual\n"
         "/track — Track record 30 hari\n\n"
+        "🛠 *Admin/Manual Fetch:*\n"
+        "/fetch\\_macro — Download IHSG/Global\n"
+        "/fetch\\_ohlcv — Download harga harian\n"
+        "/fetch\\_fundamental — Download LK\n"
+        "/fetch\\_news — Download berita & sentimen\n\n"
         "💡 *Atau gunakan tombol menu di bawah!*"
     )
     await update.message.reply_text(text, parse_mode='Markdown', reply_markup=MAIN_KEYBOARD)
@@ -388,3 +400,42 @@ async def cmd_setting(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"_Ubah via file .env dan restart bot._"
     )
     await update.message.reply_text(text, parse_mode='Markdown', reply_markup=MAIN_KEYBOARD)
+
+
+# ═══════════════════════════════════════════════════════
+# ADMIN DATA FETCH COMMANDS
+# ═══════════════════════════════════════════════════════
+
+async def cmd_fetch_macro(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("⏳ Mengunduh data makro (IHSG, Nikkei, dsb)...")
+    try:
+        fetch_and_save_macro()
+        await update.message.reply_text("✅ Data makro berhasil diunduh dan disimpan.")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error: {str(e)[:100]}")
+
+async def cmd_fetch_ohlcv(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(f"⏳ Mengunduh data OHLCV untuk {len(TEST_STOCKS)} saham...")
+    try:
+        fetch_and_save_batch(TEST_STOCKS)
+        await update.message.reply_text("✅ Data harga harian (OHLCV) berhasil diunduh.")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error: {str(e)[:100]}")
+
+async def cmd_fetch_fundamental(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(f"⏳ Mengunduh data fundamental untuk {len(TEST_STOCKS)} saham...")
+    try:
+        fetch_and_save_fundamentals(TEST_STOCKS)
+        await update.message.reply_text("✅ Data fundamental berhasil diunduh.")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error: {str(e)[:100]}")
+
+async def cmd_fetch_news(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("⏳ Mengunduh berita dan memproses sentimen AI...")
+    try:
+        articles = fetch_all_news()
+        save_articles_to_db(articles)
+        processed_count = process_unprocessed_news(limit=20)
+        await update.message.reply_text(f"✅ {len(articles)} berita diunduh, {processed_count} diklasifikasi AI.")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error: {str(e)[:100]}")
