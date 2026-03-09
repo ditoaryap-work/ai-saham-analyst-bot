@@ -30,8 +30,6 @@ def fetch_daily_data():
     """Jam 16:30 — Ambil OHLCV hari ini setelah bursa tutup."""
     logger.info("📊 JOB: Fetch Daily OHLCV Data")
     from data.fetcher.stock_fetcher import fetch_and_save_batch
-    from config.settings import LQ45_STOCKS  # atau ALL_STOCKS nantinya
-
     # Untuk saat ini gunakan TEST_STOCKS, nanti expand
     from config.settings import TEST_STOCKS
     stocks = TEST_STOCKS
