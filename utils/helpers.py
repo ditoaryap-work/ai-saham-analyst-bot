@@ -4,7 +4,17 @@ helpers.py — Utility functions untuk IDX AI Trading Assistant.
 
 import time
 from datetime import datetime, timedelta
+from curl_cffi import requests as curl_requests
 from config.settings import YFINANCE_TICKER_SUFFIX, ARB_LIMIT, get_ara_limit
+
+
+def get_yf_session():
+    """Returns a curl_cffi session that bypasses Cloudflare bot protection."""
+    session = curl_requests.Session(impersonate="chrome110")
+    # yfinance sometimes checks for 'headers' dict directly
+    if hasattr(session, 'headers'):
+        session.headers.update({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"})
+    return session
 
 
 def to_yf_ticker(kode: str) -> str:

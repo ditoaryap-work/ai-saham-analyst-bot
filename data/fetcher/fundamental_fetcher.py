@@ -23,7 +23,7 @@ sys.path.insert(0, str(ROOT))
 
 from config.settings import YFINANCE_DELAY, TEST_STOCKS
 from data.database import db
-from utils.helpers import to_yf_ticker, delay
+from utils.helpers import to_yf_ticker, delay, get_yf_session
 
 
 def fetch_fundamental(kode: str) -> dict:
@@ -34,9 +34,10 @@ def fetch_fundamental(kode: str) -> dict:
     Returns dict siap insert ke tabel fundamental.
     """
     ticker_symbol = to_yf_ticker(kode)
+    session = get_yf_session()
     
     try:
-        ticker = yf.Ticker(ticker_symbol)
+        ticker = yf.Ticker(ticker_symbol, session=session)
         info = ticker.info
         
         # Ambil laporan keuangan terbaru (kolom pertama = terbaru)

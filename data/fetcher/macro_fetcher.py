@@ -19,7 +19,7 @@ sys.path.insert(0, str(ROOT))
 
 from config.settings import MACRO_TICKERS
 from data.database import db
-from utils.helpers import delay
+from utils.helpers import delay, get_yf_session
 
 
 def fetch_index_change(ticker_symbol: str, name: str) -> float:
@@ -28,7 +28,8 @@ def fetch_index_change(ticker_symbol: str, name: str) -> float:
     Returns: persentase perubahan (misal 0.015 = +1.5%)
     """
     try:
-        ticker = yf.Ticker(ticker_symbol)
+        session = get_yf_session()
+        ticker = yf.Ticker(ticker_symbol, session=session)
         hist = ticker.history(period="5d")
         
         if hist.empty or len(hist) < 2:

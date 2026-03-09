@@ -25,7 +25,7 @@ from config.settings import (
     YFINANCE_DELAY, YFINANCE_BATCH_SIZE, YFINANCE_TICKER_SUFFIX, TEST_STOCKS
 )
 from data.database import db
-from utils.helpers import to_yf_ticker, from_yf_ticker, batch_list, delay
+from utils.helpers import to_yf_ticker, from_yf_ticker, batch_list, delay, get_yf_session
 
 
 def fetch_ohlcv(kode: str, period: str = "1y") -> pd.DataFrame:
@@ -40,9 +40,10 @@ def fetch_ohlcv(kode: str, period: str = "1y") -> pd.DataFrame:
         DataFrame dengan kolom: kode, tanggal, open, high, low, close, volume, value
     """
     ticker_symbol = to_yf_ticker(kode)
+    session = get_yf_session()
     
     try:
-        ticker = yf.Ticker(ticker_symbol)
+        ticker = yf.Ticker(ticker_symbol, session=session)
         hist = ticker.history(period=period)
         
         if hist.empty:
@@ -102,9 +103,10 @@ def fetch_emiten_info(kode: str) -> dict:
     Returns dict untuk tabel daftar_emiten.
     """
     ticker_symbol = to_yf_ticker(kode)
+    session = get_yf_session()
     
     try:
-        ticker = yf.Ticker(ticker_symbol)
+        ticker = yf.Ticker(ticker_symbol, session=session)
         info = ticker.info
         
         return {
