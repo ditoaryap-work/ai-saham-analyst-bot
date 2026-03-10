@@ -11,6 +11,7 @@ bot/formatter.py — Format pesan Telegram.
 import sys
 from pathlib import Path
 from datetime import date, datetime
+import pytz
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -19,12 +20,15 @@ sys.path.insert(0, str(ROOT))
 HARI = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
 
 
+def _jakarta_now():
+    return datetime.now(pytz.timezone('Asia/Jakarta'))
+
 def _hari_ini() -> str:
-    return HARI[date.today().weekday()]
+    return HARI[_jakarta_now().weekday()]
 
 
 def _tanggal() -> str:
-    return date.today().strftime("%d %B %Y")
+    return _jakarta_now().strftime("%d %B %Y")
 
 
 def _emoji_change(change: float) -> str:
