@@ -91,7 +91,7 @@ def format_briefing_pagi(analysis_result: dict) -> str:
         conf = final.get('confidence', debate.get('confidence', 0))
 
         lines.append("")
-        lines.append(f"{rank_emoji.get(i, f'{i}.')} /c_{kode} {emoji} {label} | Skor: {total}/100")
+        lines.append(f"{rank_emoji.get(i, f'{i}.')} *{kode}* {emoji} {label} | Skor: {total}/100 | /c_{kode}")
         lines.append(f"   💰 Harga   : Rp {close:,.0f}")
 
         if final.get('entry_low') and final.get('entry_high'):
@@ -233,7 +233,7 @@ def format_sinyal_sore(analysis_result: dict, review_pagi: dict = None) -> str:
         emoji = _emoji_label(label)
         total = score.get('total', 0)
 
-        lines.append(f"\n{i}. /c_{kode} {emoji} {label} ({total}/100)")
+        lines.append(f"\n{i}. *{kode}* {emoji} {label} ({total}/100) | /c_{kode}")
 
         if final.get('entry_low'):
             lines.append(f"   📈 Entry: Rp {final['entry_low']:,.0f}-{final['entry_high']:,.0f}")

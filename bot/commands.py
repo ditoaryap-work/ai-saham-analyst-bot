@@ -184,7 +184,7 @@ async def cmd_sinyal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for i, r in enumerate(results, 1):
             e = r.get('emoji', '❓')
             lines.append(
-                f"{rank_emoji.get(i, str(i)+'.')} /c_{r['kode']} {e} {r['label']} ({r['total']:.1f} pt)"
+                f"{rank_emoji.get(i, str(i)+'.')} *{r['kode']}* {e} {r['label']} ({r['total']:.1f} pt) | /c_{r['kode']}"
             )
 
         lines.append("\n💡 Klik tulisan biru (misal /c_BBCA) untuk lihat Chart & Analisa")
