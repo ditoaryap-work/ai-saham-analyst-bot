@@ -9,6 +9,8 @@ Row 3: [ 🔍 Analisa Saham ] [ ⚙️ Setting ]
 
 import sys
 from pathlib import Path
+from datetime import datetime
+import pytz
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -175,14 +177,14 @@ async def cmd_sinyal(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         results.sort(key=lambda x: x['total'], reverse=True)
 
-        lines = [f"🎯 *SINYAL HARI INI*\n_{source_text}_\n"]
+        tanggal_sekarang = datetime.now(pytz.timezone('Asia/Jakarta')).strftime('%d %B %Y | %H:%M WIB')
+        lines = [f"🎯 *SINYAL HARI INI* — {tanggal_sekarang}\n_{source_text}_\n"]
         rank_emoji = {1: "1️⃣", 2: "2️⃣", 3: "3️⃣", 4: "4️⃣", 5: "5️⃣", 6: "6️⃣", 7: "7️⃣", 8: "8️⃣", 9: "9️⃣", 10: "🔟"}
 
         for i, r in enumerate(results, 1):
             e = r.get('emoji', '❓')
             lines.append(
-                f"{rank_emoji.get(i, str(i)+'.')} *{r['kode']}* {e} {r['label']} ({r['total']} pt)\n"
-                f"   📈 Tech: {r['d1_technical']['score']:.0f} | 📊 Vol: {r['d2_volume']['score']:.0f} | 🏢 Fund: {r['d3_fundamental']['score']:.0f} | 📰 News: {r['d4_sentiment']['score']:.0f}"
+                f"{rank_emoji.get(i, str(i)+'.')} *{r['kode']}* {e} {r['label']} ({r['total']:.1f} pt)"
             )
 
         lines.append("\n💡 Ketik /analisa KODE untuk detail lengkap AI & Gambar Chart")
