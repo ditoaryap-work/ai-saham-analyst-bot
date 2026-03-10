@@ -144,6 +144,18 @@ async def job_fetch_fundamental(context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"JOB fundamental error: {e}")
 
 
+async def job_full_market_scan(context: ContextTypes.DEFAULT_TYPE):
+    """21:00 (Senin-Jumat) — Scan market penuh (800+ saham)."""
+    logger.info("⏰ JOB: Full Market Scan")
+    try:
+        from scheduler.jobs import fetch_full_market_scan
+        fetch_full_market_scan()
+        logger.info("✅ Full market scan completed")
+    except Exception as e:
+        logger.error(f"JOB scanner error: {e}")
+        await send_message(f"⚠️ Error scanner: {str(e)[:200]}", context.bot)
+
+
 # ═══════════════════════════════════════════════════════
 # BUILD APPLICATION
 # ═══════════════════════════════════════════════════════
@@ -169,7 +181,8 @@ async def post_init(application):
     # Setiap 2 jam: fetch news
     scheduler.add_job(_wrap, trigger=CronTrigger(hour='6,8,10,12,14,16,18,20,22'), args=[job_fetch_news, bot], name='fetch_news')
 
-    # Setiap hari: fundamental jam 22:00
+    # Setiap hari: fundamental & Full Market Scan jam 21:00 - 22:00
+    scheduler.add_job(_wrap, trigger=CronTrigger(hour=21, minute=0, day_of_week='mon-fri'), args=[job_full_market_scan, bot], name='full_market_scan')
     scheduler.add_job(_wrap, trigger=CronTrigger(hour=22, minute=0), args=[job_fetch_fundamental, bot], name='fetch_fundamental')
 
     scheduler.start()
