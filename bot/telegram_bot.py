@@ -246,7 +246,7 @@ def build_app():
         cmd_market, cmd_portfolio, cmd_pnl, cmd_beli,
         cmd_jual, cmd_track, cmd_setting, handle_button_text,
         cmd_fetch_macro, cmd_fetch_ohlcv, cmd_fetch_fundamental, cmd_fetch_news,
-        cmd_scanner, handle_callback_query
+        cmd_scanner, handle_callback_query, cmd_quick_chart
     )
 
     commands = [
@@ -273,6 +273,9 @@ def build_app():
     # ── Button text handler (Reply Keyboard) ─────
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_button_text))
     
+    # ── Dynamic Chart Command (/c_KODE) ──────────
+    app.add_handler(MessageHandler(filters.Regex(r'^/[cC]_[a-zA-Z0-9]+'), cmd_quick_chart))
+
     # ── Inline Keyboard Callback handler ────────
     app.add_handler(CallbackQueryHandler(handle_callback_query))
 

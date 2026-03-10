@@ -184,10 +184,10 @@ async def cmd_sinyal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for i, r in enumerate(results, 1):
             e = r.get('emoji', '❓')
             lines.append(
-                f"{rank_emoji.get(i, str(i)+'.')} *{r['kode']}* {e} {r['label']} ({r['total']:.1f} pt)"
+                f"{rank_emoji.get(i, str(i)+'.')} /c_{r['kode']} {e} {r['label']} ({r['total']:.1f} pt)"
             )
 
-        lines.append("\n💡 Ketik /analisa KODE untuk detail lengkap AI & Gambar Chart")
+        lines.append("\n💡 Klik tulisan biru (misal /c_BBCA) untuk lihat Chart & Analisa")
         text = "\n".join(lines)
 
         top_kode = results[0]['kode'] if results else None
@@ -215,6 +215,20 @@ async def cmd_sinyal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Error sinyal: {e}")
         await update.message.reply_text(f"❌ Error: {str(e)[:100]}", reply_markup=MAIN_KEYBOARD)
+
+
+async def cmd_quick_chart(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk command dinamis /c_KODE -> redirect ke /analisa KODE"""
+    text = update.message.text
+    if "@" in text:
+        text = text.split("@")[0]
+    kode = text.replace("/c_", "", 1).replace("/C_", "", 1).upper()
+    
+    if not kode:
+        return
+        
+    context.args = [kode]
+    await cmd_analisa(update, context)
 
 
 async def cmd_analisa(update: Update, context: ContextTypes.DEFAULT_TYPE):
