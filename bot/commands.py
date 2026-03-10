@@ -185,7 +185,7 @@ async def cmd_sinyal(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"   📈 Tech: {r['d1_technical']['score']:.0f} | 📊 Vol: {r['d2_volume']['score']:.0f} | 🏢 Fund: {r['d3_fundamental']['score']:.0f} | 📰 News: {r['d4_sentiment']['score']:.0f}"
             )
 
-        lines.append("\n💡 Ketik /analisa KODE untuk detail lengkap AI & Gambar Chart")
+        lines.append("\n💡 Klik tombol di bawah untuk detail lengkap AI & Gambar Chart")
         text = "\n".join(lines)
 
         top_kode = results[0]['kode'] if results else None
@@ -209,7 +209,21 @@ async def cmd_sinyal(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     if os.path.exists(chart_path):
                         os.remove(chart_path)
 
-        await update.message.reply_text(text, parse_mode='Markdown', reply_markup=MAIN_KEYBOARD)
+        # Build inline keyboard buttons (3 columns)
+        keyboard = []
+        row = []
+        for r in results:
+            kode = r['kode']
+            row.append(InlineKeyboardButton(f"📈 {kode}", callback_data=f"analisa_{kode}"))
+            if len(row) == 3:
+                keyboard.append(row)
+                row = []
+        if row:
+            keyboard.append(row)
+            
+        reply_markup = InlineKeyboardMarkup(keyboard) if keyboard else MAIN_KEYBOARD
+
+        await update.message.reply_text(text, parse_mode='Markdown', reply_markup=reply_markup)
     except Exception as e:
         logger.error(f"Error sinyal: {e}")
         await update.message.reply_text(f"❌ Error: {str(e)[:100]}", reply_markup=MAIN_KEYBOARD)
