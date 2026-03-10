@@ -19,11 +19,11 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from loguru import logger
+from telegram import Bot, Update
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes,
     CallbackQueryHandler
 )
-from telegram import Bot, Update, InlineKeyboardMarkup, InlineKeyboardButton
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
@@ -40,18 +40,14 @@ from bot.commands import (
 # SEND MESSAGE (untuk scheduler)
 # ═══════════════════════════════════════════════════════
 
-async def send_message(text: str, bot: Bot, chat_id: str = None, reply_markup=None):
+async def send_message(text: str, bot: Bot, chat_id: str = None):
     """Kirim pesan ke Telegram. Auto-split jika > 4096 chars."""
     cid = chat_id or TELEGRAM_CHAT_ID
     if len(text) > 4096:
         for i in range(0, len(text), 4096):
-            # Send markup only on the last chunk
-            if i + 4096 >= len(text):
-                await bot.send_message(chat_id=cid, text=text[i:i+4096], reply_markup=reply_markup)
-            else:
-                await bot.send_message(chat_id=cid, text=text[i:i+4096])
+            await bot.send_message(chat_id=cid, text=text[i:i+4096])
     else:
-        await bot.send_message(chat_id=cid, text=text, reply_markup=reply_markup)
+        await bot.send_message(chat_id=cid, text=text)
     logger.info(f"📨 Pesan terkirim ({len(text)} chars)")
 
 
@@ -92,30 +88,6 @@ async def send_top_chart(result_data: dict, bot: Bot, chat_id: str = None):
                 os.remove(chart_path)
 
 
-def build_chart_keyboard(result_data: dict) -> InlineKeyboardMarkup:
-    """Buat tombol inline untuk setiap saham yang ada di hasil analisa."""
-    if not result_data.get('signals'):
-        return None
-
-    sorted_signals = sorted(
-        result_data['signals'].items(),
-        key=lambda x: x[1].get('score', {}).get('total', 0),
-        reverse=True,
-    )
-
-    keyboard = []
-    row = []
-    for kode, _ in sorted_signals:
-        row.append(InlineKeyboardButton(f"📈 {kode}", callback_data=f"analisa_{kode}"))
-        if len(row) == 3:
-            keyboard.append(row)
-            row = []
-    if row:
-        keyboard.append(row)
-        
-    return InlineKeyboardMarkup(keyboard) if keyboard else None
-
-
 # ═══════════════════════════════════════════════════════
 # SCHEDULED JOBS
 # ═══════════════════════════════════════════════════════
@@ -138,10 +110,7 @@ async def job_briefing_pagi(context: ContextTypes.DEFAULT_TYPE):
         await send_top_chart(result, context.bot)
         
         text = format_briefing_pagi(result)
-        # Bikin tombol inline
-        reply_markup = build_chart_keyboard(result)
-        
-        await send_message(text, context.bot, reply_markup=reply_markup)
+        await send_message(text, context.bot)
     except Exception as e:
         logger.error(f"JOB briefing error: {e}")
         await send_message(f"⚠️ Error briefing pagi: {str(e)[:200]}", context.bot)
@@ -177,10 +146,7 @@ async def job_sinyal_sore(context: ContextTypes.DEFAULT_TYPE):
         await send_top_chart(result, context.bot)
         
         text = format_sinyal_sore(result)
-        # Bikin tombol inline
-        reply_markup = build_chart_keyboard(result)
-        
-        await send_message(text, context.bot, reply_markup=reply_markup)
+        await send_message(text, context.bot)
     except Exception as e:
         logger.error(f"JOB sore error: {e}")
         await send_message(f"⚠️ Error sinyal sore: {str(e)[:200]}", context.bot)

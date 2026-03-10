@@ -3,6 +3,7 @@ chart_generator.py — Generate stock chart images using mplfinance.
 """
 import os
 import sys
+import time
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -116,13 +117,26 @@ def generate_advanced_chart(kode: str, days: int = 150) -> str:
         mpf.make_addplot([20]*len(df_plot), color='#00ff00', linestyle=':', panel=3)
     ]
 
-    filepath = CHART_DIR / f"{kode}_chart.png"
+    # Get last day info for title
+    last_date = df_plot.index[-1].strftime('%d %b %Y')
+    last_close = df_plot['close'].iloc[-1]
+    last_open = df_plot['open'].iloc[-1]
+    last_high = df_plot['high'].iloc[-1]
+    last_low = df_plot['low'].iloc[-1]
+    last_vol = df_plot['volume'].iloc[-1]
+
+    title = (
+        f"\n{kode} | {last_date} | O: {last_open:,.0f} H: {last_high:,.0f} L: {last_low:,.0f} C: {last_close:,.0f} | Vol: {last_vol:,.0f}\n"
+        f"Indicators: EMA(20,50), BBands, MACD, StochRSI(14,3,3)"
+    )
+
+    filepath = CHART_DIR / f"{kode}_chart_{int(time.time())}.png"
     
     mpf.plot(
         df_plot, 
         type='candle', 
         style=s, 
-        title=f"\n{kode} - AI Breakout Scanner",
+        title=title,
         volume=True,
         volume_panel=1,
         addplot=apds,
