@@ -186,7 +186,8 @@ def build_app():
         cmd_start, cmd_help, cmd_analisa, cmd_bandingkan,
         cmd_market, cmd_portfolio, cmd_pnl, cmd_beli,
         cmd_jual, cmd_track, cmd_setting, handle_button_text,
-        cmd_fetch_macro, cmd_fetch_ohlcv, cmd_fetch_fundamental, cmd_fetch_news
+        cmd_fetch_macro, cmd_fetch_ohlcv, cmd_fetch_fundamental, cmd_fetch_news,
+        cmd_scanner
     )
 
     commands = [
@@ -205,6 +206,7 @@ def build_app():
         ("fetch_ohlcv", cmd_fetch_ohlcv),
         ("fetch_fundamental", cmd_fetch_fundamental),
         ("fetch_news", cmd_fetch_news),
+        ("scanner", cmd_scanner),
     ]
     for name, handler in commands:
         app.add_handler(CommandHandler(name, handler))

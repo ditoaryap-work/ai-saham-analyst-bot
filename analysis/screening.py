@@ -430,11 +430,17 @@ def layer3_volume_analysis(kode: str, indicators: dict = None) -> dict:
 # FULL SCREENING PIPELINE
 # ═══════════════════════════════════════════════════════
 
-def run_full_screening(stock_list: list) -> list:
+def run_full_screening(stock_list: list = None) -> list:
     """
     Jalankan screening Layer 0-3.
+    Jika stock_list None, ambil semua emiten dari database.
     ⚠️ Layer 0 adalah CLASSIFIER — sistem TIDAK PERNAH berhenti.
     """
+    if stock_list is None:
+        rows = db.execute("SELECT kode FROM daftar_emiten")
+        stock_list = [r['kode'] for r in rows]
+        logger.info(f"Screening seluruh pasar: {len(stock_list)} saham ditemukan di DB.")
+    
     market = layer0_market_context()
 
     if market['label'] == 'EXTREME':

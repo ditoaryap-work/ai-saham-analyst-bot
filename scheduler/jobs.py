@@ -27,15 +27,69 @@ from data.database import db
 
 
 def fetch_daily_data():
-    """Jam 16:30 — Ambil OHLCV hari ini setelah bursa tutup."""
+    """Jam 16:30 — Ambil OHLCV. Jika watchlist_harian kosong, ambil TEST_STOCKS."""
     logger.info("📊 JOB: Fetch Daily OHLCV Data")
     from data.fetcher.stock_fetcher import fetch_and_save_batch
-    # Untuk saat ini gunakan TEST_STOCKS, nanti expand
     from config.settings import TEST_STOCKS
-    stocks = TEST_STOCKS
+    
+    # Ambil dari watchlist hari ini jika ada
+    today = date.today().isoformat()
+    rows = db.execute("SELECT kode FROM watchlist_harian WHERE tanggal = ?", (today,))
+    if rows:
+        stocks = [r['kode'] for r in rows]
+        logger.info(f"Menggunakan {len(stocks)} saham dari watchlist_harian.")
+    else:
+        stocks = TEST_STOCKS
+        logger.info(f"Watchlist kosong, menggunakan {len(stocks)} TEST_STOCKS.")
 
     fetch_and_save_batch(stocks)
     logger.info("✅ Daily data fetch selesai")
+
+
+def fetch_full_market_scan():
+    """JOB BARU: Scan 800+ saham untuk mencari Top 10."""
+    logger.info("🚀 JOB: Full Market Scan (800+ Saham)")
+    from data.fetcher.stock_fetcher import fetch_all_idx_tickers, fetch_and_save_batch
+    from analysis.screening import run_full_screening
+    
+    # 1. Update list emiten
+    all_tickers = fetch_all_idx_tickers()
+    if not all_tickers:
+        logger.error("Gagal mendapatkan daftar emiten. Aborting scan.")
+        return
+    
+    # 2. Fetch OHLCV semua saham (Efisien: 1 batch)
+    logger.info(f"Fetching OHLCV for {len(all_tickers)} stocks...")
+    fetch_and_save_batch(all_tickers, include_info=False)
+    
+    # 3. Jalankan Screening Python
+    results = run_full_screening(all_tickers)
+    
+    # 4. Sortir & Ambil Top 10
+    results.sort(key=lambda x: (x['technical']['raw_score'] + x['volume']['raw_score']), reverse=True)
+    top_10 = results[:10]
+    
+    # 5. Simpan ke watchlist_harian
+    today = date.today().isoformat()
+    db.execute("DELETE FROM watchlist_harian WHERE tanggal = ?", (today,))
+    
+    data_to_db = []
+    for i, r in enumerate(top_10, 1):
+        data_to_db.append((
+            today,
+            r['kode'],
+            i,
+            r['technical']['raw_score'],
+            r['volume']['raw_score'],
+            r['technical']['raw_score'] + r['volume']['raw_score'],
+            date.today().isoformat()
+        ))
+    
+    db.execute_many(
+        "INSERT INTO watchlist_harian VALUES (?,?,?,?,?,?,?)",
+        data_to_db
+    )
+    logger.info(f"✅ Full market scan selesai. {len(top_10)} saham terpilih hari ini.")
 
 
 def fetch_news_and_sentiment():
@@ -64,12 +118,22 @@ def generate_morning_briefing():
     from ai.agents import run_full_analysis, format_full_report
     from config.settings import TEST_STOCKS
 
+    # Ambil dari watchlist_harian (hasil scan sore kemarin)
+    # Jika kosong (misal weekend/baru install), pakai TEST_STOCKS
+    rows = db.execute("SELECT kode FROM watchlist_harian ORDER BY tanggal DESC LIMIT 10")
+    if rows:
+        stocks = [r['kode'] for r in rows]
+        logger.info(f"Menggunakan {len(stocks)} saham dari watchlist_harian terakhir.")
+    else:
+        stocks = TEST_STOCKS
+        logger.info(f"Watchlist kosong, menggunakan {len(stocks)} TEST_STOCKS.")
+
     fetch_macro()  # Ambil data makro dulu
 
-    result = run_full_analysis(TEST_STOCKS)
+    result = run_full_analysis(stocks)
     report = format_full_report(result)
 
-    # TODO: Kirim ke Telegram (Fase 5)
+    # Note: Telegram sender dipanggil di level bot_main.py atau telegram_bot.py
     print(report)
     logger.info("✅ Morning briefing generated")
     return report
@@ -120,6 +184,7 @@ def weekly_review():
 
 JOBS = {
     'fetch_daily': fetch_daily_data,
+    'fetch_full_scan': fetch_full_market_scan,
     'fetch_news': fetch_news_and_sentiment,
     'fetch_macro': fetch_macro,
     'briefing': generate_morning_briefing,

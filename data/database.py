@@ -236,6 +236,20 @@ class Database:
                 )
             """)
 
+            # ─── Tabel 12: watchlist_harian ──────────────
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS watchlist_harian (
+                    tanggal DATE NOT NULL,
+                    kode TEXT NOT NULL,
+                    rank INTEGER,
+                    skor_l2 REAL,
+                    skor_l3 REAL,
+                    total_composite REAL,
+                    last_update DATETIME,
+                    PRIMARY KEY (tanggal, kode)
+                )
+            """)
+
             # ─── Indeks tambahan untuk performa ──────────
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_berita_tanggal

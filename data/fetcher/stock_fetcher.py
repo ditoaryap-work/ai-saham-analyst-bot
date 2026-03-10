@@ -10,8 +10,11 @@ Fitur:
 
 import sys
 import time
+import urllib.parse
 from pathlib import Path
 from datetime import datetime, date
+
+from curl_cffi import requests
 
 import yfinance as yf
 import pandas as pd
@@ -145,13 +148,14 @@ def save_emiten_to_db(emiten: dict) -> bool:
     return True
 
 
-def fetch_and_save_batch(stock_list: list, period: str = "1y"):
+def fetch_and_save_batch(stock_list: list, period: str = "1y", include_info: bool = True):
     """
     Fetch dan simpan OHLCV + info emiten untuk batch saham.
     
     Args:
         stock_list: List kode saham ['BBCA', 'TLKM', ...]
         period: Periode history yfinance
+        include_info: Jika False, lewati fetch_emiten_info (sangat mempercepat untuk full scan)
     """
     total = len(stock_list)
     success = 0
@@ -171,12 +175,16 @@ def fetch_and_save_batch(stock_list: list, period: str = "1y"):
                 if not df.empty:
                     save_ohlcv_to_db(df)
                 
-                # 2. Fetch info emiten
-                info = fetch_emiten_info(kode)
-                if info:
-                    save_emiten_to_db(info)
+                # 2. Fetch info emiten (Optional & Slow)
+                if include_info:
+                    info = fetch_emiten_info(kode)
+                    if info:
+                        save_emiten_to_db(info)
                 
                 success += 1
+                logger.info(f"  [{success}/{total}] Selesai: {kode}")
+                
+                # Jeda antar saham (Rate Limit)
                 delay(YFINANCE_DELAY)
                 
             except Exception as e:
@@ -198,43 +206,61 @@ def fetch_and_save_batch(stock_list: list, period: str = "1y"):
     return success, failed
 
 
+def fetch_all_idx_tickers() -> list:
+    """
+    Fetch seluruh daftar emiten dari website IDX via Cloudflare Proxy.
+    Returns list kode saham ['AADI', 'ABBA', ...].
+    """
+    proxy_url = "https://yahoo-proxy.ditoaryap-work.workers.dev/?url="
+    idx_api = "https://www.idx.co.id/primary/ListedCompany/GetCompanyProfiles?emitenType=s&start=0&length=1000"
+    target = f"{proxy_url}{urllib.parse.quote(idx_api)}"
+    
+    logger.info("Fetching all IDX tickers via Cloudflare Proxy...")
+    try:
+        r = requests.get(target, impersonate="chrome110", timeout=30)
+        if r.status_code != 200:
+            logger.error(f"Gagal fetch tickers: Status {r.status_code}")
+            return []
+        
+        data = r.json()
+        raw_list = data.get('data', [])
+        tickers = [item['KodeEmiten'].upper().strip() for item in raw_list if 'KodeEmiten' in item]
+        
+        logger.info(f"Berhasil mendapatkan {len(tickers)} ticker dari IDX.")
+        
+        # Simpan info dasar ke DB
+        for item in raw_list:
+            if 'KodeEmiten' not in item:
+                continue
+            emiten = {
+                'kode': item['KodeEmiten'].upper().strip(),
+                'nama': item.get('NamaEmiten', ''),
+                'sektor': item.get('Sektor', ''),
+                'subsektor': item.get('SubSektor', ''),
+                'papan': item.get('PapanPencatatan', ''),
+                'listed_date': item.get('TanggalPencatatan', '')[:10],
+                'market_cap': 0, # yfinance akan update ini nanti
+                'is_suspended': 0,
+                'last_update': date.today().isoformat(),
+            }
+            save_emiten_to_db(emiten)
+            
+        return tickers
+    except Exception as e:
+        logger.error(f"Error fetch_all_idx_tickers: {e}")
+        return []
+
+
 # ── Entry point untuk testing ────────────────────────
 if __name__ == "__main__":
-    print("\n🚀 Stock Fetcher — Test dengan 5 saham LQ45\n")
+    import urllib.parse
+    print("\n🚀 Stock Fetcher — Test Full Market Tickers\n")
     
     db.create_all_tables()
     
-    success, failed = fetch_and_save_batch(TEST_STOCKS, period="1y")
-    
-    # Verifikasi data di DB
-    print("\n📊 Verifikasi Data di Database:")
-    print("-" * 50)
-    
-    for kode in TEST_STOCKS:
-        rows = db.execute(
-            "SELECT COUNT(*) as cnt, MIN(tanggal) as first, MAX(tanggal) as last "
-            "FROM harga_historis WHERE kode = ?",
-            (kode,),
-        )
-        r = dict(rows[0])
-        
-        emiten = db.execute(
-            "SELECT nama, sektor, market_cap FROM daftar_emiten WHERE kode = ?",
-            (kode,),
-        )
-        
-        if r['cnt'] > 0:
-            e = dict(emiten[0]) if emiten else {}
-            nama = e.get('nama', '-')
-            sektor = e.get('sektor', '-')
-            mcap = e.get('market_cap', 0)
-            mcap_str = f"Rp {mcap/1e12:.1f}T" if mcap else "-"
-            
-            print(f"  ✅ {kode} ({nama})")
-            print(f"     Sektor: {sektor} | MCap: {mcap_str}")
-            print(f"     Data: {r['cnt']} hari ({r['first']} → {r['last']})")
-        else:
-            print(f"  ❌ {kode}: Tidak ada data!")
-    
-    print("-" * 50)
-    print(f"\n🎉 Test selesai! {success} saham berhasil di-fetch.")
+    all_tickers = fetch_all_idx_tickers()
+    if all_tickers:
+        print(f"Total tickers found: {len(all_tickers)}")
+        print(f"Sample 5: {all_tickers[:5]}")
+    else:
+        print("Failed to fetch tickers.")

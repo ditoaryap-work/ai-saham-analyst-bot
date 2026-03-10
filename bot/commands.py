@@ -132,6 +132,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "*Analisa:*\n"
         "/analisa `KODE` — Analisa 5-agent AI\n"
         "/bandingkan `K1 K2` — Bandingkan 2 saham\n"
+        "/sinyal — Sinyal Top 10 harian\n"
         "/market — Kondisi pasar\n\n"
         "*Portfolio:*\n"
         "/portfolio — Lihat posisi\n"
@@ -140,6 +141,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/jual `KODE LOT HARGA` — Input jual\n"
         "/track — Track record 30 hari\n\n"
         "🛠 *Admin/Manual Fetch:*\n"
+        "/scanner — Full market scan (800+ saham)\n"
         "/fetch\\_macro — Download IHSG/Global\n"
         "/fetch\\_ohlcv — Download harga harian\n"
         "/fetch\\_fundamental — Download LK\n"
@@ -150,19 +152,28 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_sinyal(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Sinyal hari ini (quick scoring tanpa AI agent penuh)."""
-    await update.message.reply_text("🔍 Menghitung skor saham...", reply_markup=MAIN_KEYBOARD)
+    """Sinyal hari ini (diambil dari watchlist_harian hasil scanner)."""
+    await update.message.reply_text("🎯 Mengambil rekomendasi Top 10 hari ini...", reply_markup=MAIN_KEYBOARD)
 
     try:
+        # 1. Cek watchlist_harian terbaru
+        rows = db.execute("SELECT kode FROM watchlist_harian ORDER BY tanggal DESC LIMIT 10")
+        if rows:
+            stocks = [r['kode'] for r in rows]
+            source_text = "berdasarkan *Full Market Scan*"
+        else:
+            stocks = TEST_STOCKS
+            source_text = "berdasarkan *Test Stocks* (Scan belum dijalankan)"
+
         results = []
-        for kode in TEST_STOCKS:
+        for kode in stocks:
             score = calculate_composite_score(kode)
             results.append(score)
 
         results.sort(key=lambda x: x['total'], reverse=True)
 
-        lines = ["🎯 *SINYAL HARI INI*\n"]
-        rank_emoji = {1: "1️⃣", 2: "2️⃣", 3: "3️⃣", 4: "4️⃣", 5: "5️⃣"}
+        lines = [f"🎯 *SINYAL HARI INI*\n_{source_text}_\n"]
+        rank_emoji = {1: "1️⃣", 2: "2️⃣", 3: "3️⃣", 4: "4️⃣", 5: "5️⃣", 6: "6️⃣", 7: "7️⃣", 8: "8️⃣", 9: "9️⃣", 10: "🔟"}
 
         for i, r in enumerate(results, 1):
             e = r.get('emoji', '❓')
@@ -439,3 +450,23 @@ async def cmd_fetch_news(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ {len(articles)} berita diunduh, {processed_count} diklasifikasi AI.")
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {str(e)[:100]}")
+
+
+async def cmd_scanner(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Trigger Full Market Scan (800+ saham)."""
+    await update.message.reply_text(
+        "🚀 *MEMULAI FULL MARKET SCAN*\n"
+        "📦 Memproses 800+ saham IHSG...\n"
+        "⏳ Estimasi waktu: 5-10 menit di VPS.\n"
+        "💡 Hasil akan muncul otomatis di menu 'Sinyal Hari Ini' setelah selesai.",
+        parse_mode='Markdown', reply_markup=MAIN_KEYBOARD
+    )
+    try:
+        from scheduler.jobs import fetch_full_market_scan
+        # Jalankan secara sync untuk sekarang agar user tau statusnya (atau bisa async di VPS)
+        # Di sini kita panggil langsung function-nya
+        fetch_full_market_scan()
+        await update.message.reply_text("✅ Full market scan SELESAI! Silakan cek menu Sinyal Hari Ini.")
+    except Exception as e:
+        logger.error(f"Error scanner: {e}")
+        await update.message.reply_text(f"❌ Error scanner: {str(e)[:100]}")
