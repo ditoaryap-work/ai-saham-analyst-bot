@@ -148,7 +148,10 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/fetch\\_news — Download berita & sentimen\n\n"
         "💡 *Atau gunakan tombol menu di bawah!*"
     )
-    await update.message.reply_text(text, parse_mode='Markdown', reply_markup=MAIN_KEYBOARD)
+    if update.message:
+        await update.message.reply_text(text, parse_mode='Markdown', reply_markup=MAIN_KEYBOARD)
+    elif update.callback_query:
+        await update.callback_query.message.reply_text(text, parse_mode='Markdown', reply_markup=MAIN_KEYBOARD)
 
 
 async def cmd_sinyal(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -178,12 +181,11 @@ async def cmd_sinyal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for i, r in enumerate(results, 1):
             e = r.get('emoji', '❓')
             lines.append(
-                f"{rank_emoji.get(i, str(i)+'.')} {e} *{r['kode']}* — {r['label']} ({r['total']}/100)\n"
-                f"   T:{r['d1_technical']['score']:.0f} V:{r['d2_volume']['score']:.0f} "
-                f"F:{r['d3_fundamental']['score']:.0f} S:{r['d4_sentiment']['score']:.0f}"
+                f"{rank_emoji.get(i, str(i)+'.')} *{r['kode']}* {e} {r['label']} ({r['total']} pt)\n"
+                f"   📈 Tech: {r['d1_technical']['score']:.0f} | 📊 Vol: {r['d2_volume']['score']:.0f} | 🏢 Fund: {r['d3_fundamental']['score']:.0f} | 📰 News: {r['d4_sentiment']['score']:.0f}"
             )
 
-        lines.append("\n💡 Ketik /analisa KODE untuk detail lengkap AI")
+        lines.append("\n💡 Ketik /analisa KODE untuk detail lengkap AI & Gambar Chart")
         await update.message.reply_text("\n".join(lines), parse_mode='Markdown', reply_markup=MAIN_KEYBOARD)
     except Exception as e:
         logger.error(f"Error sinyal: {e}")
@@ -212,13 +214,34 @@ async def cmd_analisa(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if kode in result.get('signals', {}):
             data = result['signals'][kode]
             text = format_analisa(kode, data)
+            
+            # Tambahkan Auto-Chart Image
+            from utils.chart_generator import generate_advanced_chart
+            chart_path = generate_advanced_chart(kode, days=150)
+            if chart_path:
+                try:
+                    with open(chart_path, 'rb') as photo:
+                        await context.bot.send_photo(
+                            chat_id=update.effective_chat.id,
+                            photo=photo,
+                            caption=f"📈 *{kode}* — Auto-Chart (EMA, BB, Volume, MACD, StochRSI)",
+                            parse_mode="Markdown"
+                        )
+                except Exception as e:
+                    logger.error(f"Gagal mengirim chart {kode}: {e}")
+                finally:
+                    # Optional: hapus gambar jika tidak ingin memakan tempat
+                    import os
+                    if os.path.exists(chart_path):
+                        os.remove(chart_path)
+            
         else:
             text = f"❌ Gagal menganalisa {kode}. Pastikan kode saham benar."
     except Exception as e:
         logger.error(f"Error analisa {kode}: {e}")
         text = f"❌ Error analisa {kode}: {str(e)[:150]}"
 
-    await update.message.reply_text(text, reply_markup=MAIN_KEYBOARD)
+    await update.message.reply_text(text, parse_mode='Markdown', reply_markup=MAIN_KEYBOARD)
 
 
 async def cmd_bandingkan(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -410,7 +433,28 @@ async def cmd_setting(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Test stocks : {', '.join(TEST_STOCKS)}\n\n"
         f"_Ubah via file .env dan restart bot._"
     )
-    await update.message.reply_text(text, parse_mode='Markdown', reply_markup=MAIN_KEYBOARD)
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📖 Baca Panduan Lengkap (/help)", callback_data="help")]
+    ])
+    await update.message.reply_text(text, parse_mode='Markdown', reply_markup=keyboard)
+
+
+async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle respons dari InlineKeyboardButton."""
+    query = update.callback_query
+    await query.answer()  # Wajib panggil ini agar indikator loading di tombol hilang
+    
+    data = query.data
+    logger.info(f"Callback Query: {data}")
+    
+    if data == "help":
+        await cmd_help(update, context)
+    elif data.startswith("analisa_"):
+        kode = data.split("_")[1]
+        context.args = [kode]
+        # Agar update.message dikenali walau dari callback
+        update.message = query.message 
+        await cmd_analisa(update, context)
 
 
 # ═══════════════════════════════════════════════════════

@@ -22,6 +22,7 @@ from loguru import logger
 from telegram import Bot, Update
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes,
+    CallbackQueryHandler
 )
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -187,7 +188,7 @@ def build_app():
         cmd_market, cmd_portfolio, cmd_pnl, cmd_beli,
         cmd_jual, cmd_track, cmd_setting, handle_button_text,
         cmd_fetch_macro, cmd_fetch_ohlcv, cmd_fetch_fundamental, cmd_fetch_news,
-        cmd_scanner
+        cmd_scanner, handle_callback_query
     )
 
     commands = [
@@ -213,8 +214,11 @@ def build_app():
 
     # ── Button text handler (Reply Keyboard) ─────
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_button_text))
+    
+    # ── Inline Keyboard Callback handler ────────
+    app.add_handler(CallbackQueryHandler(handle_callback_query))
 
-    logger.info(f"✅ {len(commands)} commands + button handler registered")
+    logger.info(f"✅ {len(commands)} commands + button & callback handlers registered")
     return app
 
 

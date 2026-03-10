@@ -68,6 +68,27 @@ def fetch_full_market_scan():
     # 4. Sortir & Ambil Top 10
     results.sort(key=lambda x: (x['technical']['raw_score'] + x['volume']['raw_score']), reverse=True)
     top_10 = results[:10]
+    top_10_kodes = [r['kode'] for r in top_10]
+    
+    # 4.5. Deep-Fetch (Fundamental, Info, News) Khusus Top 10
+    logger.info(f"📥 Deep-fetching data (Fundamental & News) untuk Top 10: {top_10_kodes}")
+    try:
+        from data.fetcher.fundamental_fetcher import fetch_and_save_fundamentals
+        from data.fetcher.news_fetcher import fetch_all_news, save_articles_to_db
+        from bot.jobs_helper import process_unprocessed_news_sync # If needed, or we just rely on the next scheduler
+        
+        # Re-fetch info (company profile dll) supaya tidak kosong
+        fetch_and_save_batch(top_10_kodes, include_info=True)
+        # Fetch fundamental
+        fetch_and_save_fundamentals(top_10_kodes)
+        # Fetch news
+        articles = fetch_all_news(top_10_kodes, max_results=5)
+        save_articles_to_db(articles)
+        
+        # Note: Sentimen analisis akan dijalankan oleh scheduler job_fetch_news berikutnya,
+        # Atau bisa dipanggil langsung jika ingin realtime. Untuk simplifikasi, biarkan scheduler yang handle.
+    except Exception as e:
+        logger.error(f"⚠️ Error saat deep-fetch Top 10: {e}")
     
     # 5. Simpan ke watchlist_harian
     today = date.today().isoformat()
