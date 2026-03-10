@@ -186,7 +186,30 @@ async def cmd_sinyal(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
         lines.append("\n💡 Ketik /analisa KODE untuk detail lengkap AI & Gambar Chart")
-        await update.message.reply_text("\n".join(lines), parse_mode='Markdown', reply_markup=MAIN_KEYBOARD)
+        text = "\n".join(lines)
+
+        top_kode = results[0]['kode'] if results else None
+        
+        if top_kode:
+            from utils.chart_generator import generate_advanced_chart
+            chart_path = generate_advanced_chart(top_kode, days=150)
+            if chart_path:
+                try:
+                    with open(chart_path, 'rb') as photo:
+                        await context.bot.send_photo(
+                            chat_id=update.effective_chat.id,
+                            photo=photo,
+                            caption=f"📈 Chart Top #1 Pilihan AI: *{top_kode}*",
+                            parse_mode="Markdown"
+                        )
+                except Exception as e:
+                    logger.error(f"Gagal mengirim chart top_kode {top_kode}: {e}")
+                finally:
+                    import os
+                    if os.path.exists(chart_path):
+                        os.remove(chart_path)
+
+        await update.message.reply_text(text, parse_mode='Markdown', reply_markup=MAIN_KEYBOARD)
     except Exception as e:
         logger.error(f"Error sinyal: {e}")
         await update.message.reply_text(f"❌ Error: {str(e)[:100]}", reply_markup=MAIN_KEYBOARD)

@@ -51,6 +51,43 @@ async def send_message(text: str, bot: Bot, chat_id: str = None):
     logger.info(f"📨 Pesan terkirim ({len(text)} chars)")
 
 
+async def send_top_chart(result_data: dict, bot: Bot, chat_id: str = None):
+    """Mencari Top #1 saham dari result_data, buat chart, lalu kirim ke Telegram."""
+    cid = chat_id or TELEGRAM_CHAT_ID
+    if not result_data.get('signals'):
+        return
+
+    sorted_signals = sorted(
+        result_data['signals'].items(),
+        key=lambda x: x[1].get('score', {}).get('total', 0),
+        reverse=True,
+    )
+    
+    if not sorted_signals:
+        return
+        
+    top_kode = sorted_signals[0][0]
+    
+    from utils.chart_generator import generate_advanced_chart
+    chart_path = generate_advanced_chart(top_kode, days=150)
+    
+    if chart_path:
+        try:
+            with open(chart_path, 'rb') as photo:
+                await bot.send_photo(
+                    chat_id=cid,
+                    photo=photo,
+                    caption=f"📈 Chart Top #1 Pilihan AI: *{top_kode}*",
+                    parse_mode="Markdown"
+                )
+        except Exception as e:
+            logger.error(f"Gagal send top chart {top_kode}: {e}")
+        finally:
+            import os
+            if os.path.exists(chart_path):
+                os.remove(chart_path)
+
+
 # ═══════════════════════════════════════════════════════
 # SCHEDULED JOBS
 # ═══════════════════════════════════════════════════════
@@ -68,6 +105,10 @@ async def job_briefing_pagi(context: ContextTypes.DEFAULT_TYPE):
         fetch_and_save_macro()
         result = run_full_analysis(TEST_STOCKS)
         result['track_record'] = get_track_record(30)
+        
+        # Kirim chart top #1 dulu
+        await send_top_chart(result, context.bot)
+        
         text = format_briefing_pagi(result)
         await send_message(text, context.bot)
     except Exception as e:
@@ -100,6 +141,10 @@ async def job_sinyal_sore(context: ContextTypes.DEFAULT_TYPE):
         from config.settings import TEST_STOCKS
 
         result = run_full_analysis(TEST_STOCKS)
+        
+        # Kirim chart top #1 dulu
+        await send_top_chart(result, context.bot)
+        
         text = format_sinyal_sore(result)
         await send_message(text, context.bot)
     except Exception as e:
