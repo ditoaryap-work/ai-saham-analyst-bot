@@ -40,12 +40,12 @@ from ai.sentiment import process_unprocessed_news
 
 
 # ═══════════════════════════════════════════════════════
-# REPLY KEYBOARD (Menu Tombol Permanen)
+# REPLY KEYBOARDS (Menu & Sub-Menu)
 # ═══════════════════════════════════════════════════════
 
 MAIN_KEYBOARD = ReplyKeyboardMarkup(
     [
-        [KeyboardButton("📊 Market"), KeyboardButton("🎯 Sinyal Hari Ini")],
+        [KeyboardButton("📊 Market"), KeyboardButton("🎯 Sinyal Pagi")],
         [KeyboardButton("🌆 BSJP Sore"), KeyboardButton("🌊 Swing Trade")],
         [KeyboardButton("💼 Portfolio"), KeyboardButton("⚙️ Setting")],
     ],
@@ -53,24 +53,92 @@ MAIN_KEYBOARD = ReplyKeyboardMarkup(
     is_persistent=True,
 )
 
+SINYAL_KEYBOARD = ReplyKeyboardMarkup(
+    [
+        [KeyboardButton("🔄 Update Sinyal Pagi"), KeyboardButton("🎯 Sinyal Pagi Ini")],
+        [KeyboardButton("📈 Cek Performa AI"), KeyboardButton("🔙 Kembali")],
+    ],
+    resize_keyboard=True,
+    is_persistent=True,
+)
+
+BSJP_KEYBOARD = ReplyKeyboardMarkup(
+    [
+        [KeyboardButton("🔄 Update BSJP Sore"), KeyboardButton("🌆 BSJP Hari Ini")],
+        [KeyboardButton("ℹ️ Bantuan BSJP"), KeyboardButton("🔙 Kembali")],
+    ],
+    resize_keyboard=True,
+    is_persistent=True,
+)
+
+SWING_KEYBOARD = ReplyKeyboardMarkup(
+    [
+        [KeyboardButton("🔄 Update Swing Data"), KeyboardButton("🌊 Swing Hari Ini")],
+        [KeyboardButton("ℹ️ Bantuan Swing"), KeyboardButton("🔙 Kembali")],
+    ],
+    resize_keyboard=True,
+    is_persistent=True,
+)
 
 def _reply(text: str):
-    """Helper: tambahkan keyboard ke setiap reply."""
+    """Helper: tambahkan keyboard utama ke setiap reply."""
     return {'text': text, 'reply_markup': MAIN_KEYBOARD}
 
-
-# ═══════════════════════════════════════════════════════
-# BUTTON TEXT HANDLER (baca tombol yang ditekan)
-# ═══════════════════════════════════════════════════════
 
 async def handle_button_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle tombol Reply Keyboard yang ditekan user."""
     text = update.message.text.strip()
 
+    # --- MENU UTAMA ---
     if text == "📊 Market":
         await cmd_market(update, context)
-    elif text == "🎯 Sinyal Hari Ini":
+        
+    elif text == "🎯 Sinyal Pagi":
+        await update.message.reply_text("🎯 <b>Pusat Komando Sinyal Pagi</b>\nPilih menu di bawah:", parse_mode='HTML', reply_markup=SINYAL_KEYBOARD)
+    elif text == "🌆 BSJP Sore":
+        await update.message.reply_text("🌆 <b>Pusat Komando BSJP Sore</b>\nPilih menu di bawah:", parse_mode='HTML', reply_markup=BSJP_KEYBOARD)
+    elif text == "🌊 Swing Trade":
+        await update.message.reply_text("🌊 <b>Pusat Komando Swing Trade</b>\nPilih menu di bawah:", parse_mode='HTML', reply_markup=SWING_KEYBOARD)
+    elif text == "🔙 Kembali":
+        await update.message.reply_text("🏠 <b>Kembali ke Menu Utama</b>", parse_mode='HTML', reply_markup=MAIN_KEYBOARD)
+
+    # --- SUB-MENU: SINYAL PAGI ---
+    elif text == "🎯 Sinyal Pagi Ini":
         await cmd_sinyal(update, context)
+    elif text == "🔄 Update Sinyal Pagi":
+        await update.message.reply_text("⏳ Update Sinyal Pagi (Fetch Fresh)...")
+        await cmd_sinyal(update, context)
+    elif text == "📈 Cek Performa AI":
+        await cmd_performance_check(update, context)
+
+    # --- SUB-MENU: BSJP SORE ---
+    elif text == "🌆 BSJP Hari Ini":
+        await cmd_bsjp(update, context)
+    elif text == "🔄 Update BSJP Sore":
+        await update.message.reply_text("⏳ Manual trigger update BSJP (pastikan market buka)...")
+        await cmd_bsjp(update, context)
+    elif text == "ℹ️ Bantuan BSJP":
+        await update.message.reply_text(
+            "<b>Beli Sore Jual Pagi (BSJP):</b>\n"
+            "Strategi momentum cepat. Beli saham ini sekitar jam <b>15:50</b> WIB, lalu antri jual besok pagi saat market buka (09:00 - 09:30).",
+            parse_mode='HTML', reply_markup=BSJP_KEYBOARD
+        )
+        
+    # --- SUB-MENU: SWING TRADE ---
+    elif text == "🌊 Swing Hari Ini":
+        await cmd_swing(update, context)
+    elif text == "🔄 Update Swing Data":
+        await update.message.reply_text("⏳ Manual trigger update Swing (Running scan)...")
+        await cmd_swing(update, context)
+    elif text == "ℹ️ Bantuan Swing":
+        await update.message.reply_text(
+            "<b>Swing Trade:</b>\n"
+            "Strategi hold saham selama <b>3-7 hari</b> ke depan.\n"
+            "Perhatikan area Support/Resisten untuk melakukan cicil beli bertahap (max 3x peluru).",
+            parse_mode='HTML', reply_markup=SWING_KEYBOARD
+        )
+
+    # --- MENU LAINNYA ---
     elif text == "💼 Portfolio":
         await cmd_portfolio(update, context)
     elif text == "📈 Track Record":
@@ -93,10 +161,6 @@ async def handle_button_text(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 ],
             ]),
         )
-    elif text == "🌆 BSJP Sore":
-        await cmd_bsjp(update, context)
-    elif text == "🌊 Swing Trade":
-        await cmd_swing(update, context)
     elif text == "⚙️ Setting":
         await cmd_setting(update, context)
     else:
@@ -106,8 +170,7 @@ async def handle_button_text(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await cmd_analisa(update, context)
         else:
             await update.message.reply_text(
-                "🤖 Gunakan tombol di bawah atau ketik /help",
-                reply_markup=MAIN_KEYBOARD,
+                "🤖 Gunakan tombol menu yang tersedia, atau ketik /help",
             )
 
 
@@ -204,65 +267,39 @@ async def cmd_sinyal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         lines.append("\n💡 /c_KODE = Chart | /a_KODE = Analisa AI")
         text = "\n".join(lines)
 
-        top_kode = results[0]['kode'] if results else None
+        result = run_full_analysis(stocks)
+        result['track_record'] = get_track_record(30)
         
-        if top_kode:
-            from utils.chart_generator import generate_advanced_chart
-            chart_path = generate_advanced_chart(top_kode, days=150)
-            if chart_path:
-                try:
-                    with open(chart_path, 'rb') as photo:
-                        await context.bot.send_photo(
-                            chat_id=update.effective_chat.id,
-                            photo=photo,
-                            caption=f"📈 Chart Top #1 Pilihan AI: <b>{top_kode}</b>",
-                            parse_mode="HTML"
-                        )
-                except Exception as e:
-                    logger.error(f"Gagal mengirim chart top_kode {top_kode}: {e}")
-                finally:
-                    import os
-                    if os.path.exists(chart_path):
-                        os.remove(chart_path)
+        # Kirim chart top #1 dulu
+        await _send_top_chart(result, update, context)
 
-        await update.message.reply_text(text, parse_mode='HTML', reply_markup=MAIN_KEYBOARD)
+        text = format_briefing_pagi(result)
+        try:
+            await msg.delete()
+        except:
+            pass
+        await update.message.reply_text(text, parse_mode='HTML', reply_markup=SINYAL_KEYBOARD)
     except Exception as e:
-        logger.error(f"Error sinyal: {e}")
-        await update.message.reply_text(f"❌ Error: {str(e)[:100]}", reply_markup=MAIN_KEYBOARD)
+        logger.error(f"Error Sinyal: {e}")
+        await update.message.reply_text(f"❌ Error: {str(e)[:100]}", reply_markup=SINYAL_KEYBOARD)
 
 
 async def cmd_bsjp(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """BSJP (Beli Sore Jual Pagi) — Quick screening for overnight trades."""
-    await update.message.reply_text(
-        "🌆 <b>Scanning BSJP...</b>\n⏳ Menganalisa 100-200 kandidat (3-8 menit)",
-        parse_mode='HTML', reply_markup=MAIN_KEYBOARD
-    )
-
     try:
-        from analysis.bsjp_screening import run_bsjp_screening, save_bsjp_watchlist, get_bsjp_candidates
-        from data.fetcher.stock_fetcher import fetch_and_save_batch
+        from analysis.bsjp_screening import run_bsjp_screening, get_bsjp_candidates
         from bot.formatter import format_bsjp
 
-        # Step 1: Ambil daftar kandidat
+        msg = await update.message.reply_text("⏳ Mencari kandidat BSJP (Volume Spike)...", reply_markup=BSJP_KEYBOARD)
+
         candidates = get_bsjp_candidates(200)
-
-        # Step 2: Download data OHLCV FRESH hari ini (bukan data kemarin)
-        logger.info(f"BSJP: Fetching fresh OHLCV for {len(candidates)} candidates...")
-        fetch_and_save_batch(candidates, include_info=False)
-
-        # Step 3: Scan dengan data fresh
         results = run_bsjp_screening(candidates)
-        
+
         if not results:
-            await update.message.reply_text(
-                "❌ Tidak ada kandidat BSJP yang memenuhi kriteria hari ini.",
-                reply_markup=MAIN_KEYBOARD
-            )
+            await update.message.reply_text("🌆 Tidak ada saham yang memenuhi kriteria BSJP saat ini.", reply_markup=BSJP_KEYBOARD)
             return
 
-        save_bsjp_watchlist(results)
-
-        # Kirim chart top #1
+        # Kirim chart top #1 bsjp
         top_kode = results[0]['kode']
         from utils.chart_generator import generate_advanced_chart
         chart_path = generate_advanced_chart(top_kode, days=60)
@@ -273,57 +310,41 @@ async def cmd_bsjp(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         chat_id=update.effective_chat.id,
                         photo=photo,
                         caption=f"📈 BSJP Top #1: <b>{top_kode}</b>",
-                        parse_mode="HTML"
+                        parse_mode='HTML'
                     )
-            except Exception as e:
-                logger.error(f"Gagal mengirim chart BSJP {top_kode}: {e}")
-            finally:
-                import os
-                if os.path.exists(chart_path):
-                    os.remove(chart_path)
+            except:
+                pass
 
         text = format_bsjp(results)
-        await update.message.reply_text(text, parse_mode='HTML', reply_markup=MAIN_KEYBOARD)
+        try:
+            await msg.delete()
+        except:
+            pass
+        await update.message.reply_text(text, parse_mode='HTML', reply_markup=BSJP_KEYBOARD)
     except Exception as e:
         logger.error(f"Error BSJP: {e}")
-        await update.message.reply_text(f"❌ Error BSJP: {str(e)[:100]}", reply_markup=MAIN_KEYBOARD)
+        await update.message.reply_text(f"❌ Error: {str(e)[:100]}", reply_markup=BSJP_KEYBOARD)
 
 
 async def cmd_swing(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Swing Trade (Hold 3-7 hari) — Trend following & Accumulation screening."""
-    await update.message.reply_text(
-        "🌊 <b>Scanning Swing Trade...</b>\n⏳ Menganalisa seluruh market untuk mid-term trend (3-8 menit)",
-        parse_mode='HTML', reply_markup=MAIN_KEYBOARD
-    )
-
     try:
-        from analysis.swing_screening import run_swing_screening, save_swing_watchlist, get_swing_candidates
-        from data.fetcher.stock_fetcher import fetch_and_save_batch
+        from analysis.swing_screening import run_swing_screening, get_swing_candidates
         from bot.formatter import format_swing
 
-        # Step 1: Ambil daftar kandidat (high value)
+        msg = await update.message.reply_text("⏳ Menganalisa setup Swing Trade (hold mingguan)...", reply_markup=SWING_KEYBOARD)
+
         candidates = get_swing_candidates(150)
-
-        # Step 2: Download data OHLCV FRESH hari ini
-        logger.info(f"Swing: Fetching fresh OHLCV for {len(candidates)} candidates...")
-        fetch_and_save_batch(candidates, include_info=False)
-
-        # Step 3: Scan dengan data fresh
         results = run_swing_screening(candidates)
-        
+
         if not results:
-            await update.message.reply_text(
-                "❌ Tidak ada kandidat Swing Trade yang memenuhi kriteria kuat hari ini.",
-                reply_markup=MAIN_KEYBOARD
-            )
+            await update.message.reply_text("🌊 Tidak ada setup swing yang terkonfirmasi hari ini.", reply_markup=SWING_KEYBOARD)
             return
 
-        save_swing_watchlist(results)
-
-        # Kirim chart top #1
+        # Kirim chart top #1 swing
         top_kode = results[0]['kode']
         from utils.chart_generator import generate_advanced_chart
-        chart_path = generate_advanced_chart(top_kode, days=150) # Lebih panjang untuk lihat trend
+        chart_path = generate_advanced_chart(top_kode, days=150)
         if chart_path:
             try:
                 with open(chart_path, 'rb') as photo:
@@ -331,7 +352,7 @@ async def cmd_swing(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         chat_id=update.effective_chat.id,
                         photo=photo,
                         caption=f"📈 Swing Top #1: <b>{top_kode}</b>",
-                        parse_mode="HTML"
+                        parse_mode='HTML'
                     )
             except Exception as e:
                 logger.error(f"Gagal mengirim chart Swing {top_kode}: {e}")
@@ -361,18 +382,40 @@ async def cmd_quick_chart(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     try:
         from utils.chart_generator import generate_advanced_chart
+        from analysis.scoring import calculate_composite_score
+        
+        # Hitung skor teknikal cepat untuk dapatkan rentang harga
+        score_data = calculate_composite_score(kode)
+        
         chart_path = generate_advanced_chart(kode, days=150)
         if chart_path:
             try:
+                caption = (
+                    f"📈 <b>{kode}</b> — Chart Teknikal\n"
+                    f"Status: {score_data.get('emoji', '❓')} {score_data.get('label', 'UNKNOWN')}\n"
+                    f"─────────────────────\n"
+                )
+                
+                if score_data.get('entry_low'):
+                    tp1 = score_data.get('tp1', 0)
+                    tp2 = score_data.get('tp2', 0)
+                    sl = score_data.get('cl', 0)
+                    caption += (
+                        f"[ Harga  ] Rp {score_data.get('close', 0):,.0f}\n"
+                        f"[ Entry  ] Rp {score_data['entry_low']:,.0f} - {score_data['entry_high']:,.0f}\n"
+                        f"[ TP1    ] Rp {tp1:,.0f} ({score_data.get('tp1_pct', 0):+.1f}%)\n"
+                        f"[ TP2    ] Rp {tp2:,.0f} ({score_data.get('tp2_pct', 0):+.1f}%)\n"
+                        f"[ SL     ] Rp {sl:,.0f} ({score_data.get('cl_pct', 0):+.1f}%)\n"
+                        f"─────────────────────\n"
+                    )
+                
+                caption += f"💡 Ketik /a_{kode} untuk analisa AI lengkap"
+
                 with open(chart_path, 'rb') as photo:
                     await context.bot.send_photo(
                         chat_id=update.effective_chat.id,
                         photo=photo,
-                        caption=(
-                            f"📈 <b>{kode}</b> — Chart Teknikal\n"
-                            f"Indikator: EMA 20/50, BBands, MACD, StochRSI\n\n"
-                            f"💡 Ketik /a_{kode} untuk analisa AI lengkap"
-                        ),
+                        caption=caption,
                         parse_mode="HTML"
                     )
             except Exception as e:

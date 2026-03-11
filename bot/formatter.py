@@ -91,24 +91,33 @@ def format_briefing_pagi(analysis_result: dict) -> str:
         conf = final.get('confidence', debate.get('confidence', 0))
 
         lines.append("")
-        lines.append(f"{rank_emoji.get(i, f'{i}.')} <b>{kode}</b> {emoji} {label} | Skor: {total}/100 | /c_{kode}")
-        lines.append(f"   💰 Harga   : Rp {close:,.0f}")
+        lines.append(f"{rank_emoji.get(i, f'{i}.')} <b>{kode}</b>  |  /c_{kode}")
+        lines.append("─────────────────────")
+        lines.append(f"[ Status ] {emoji} {label} ({total}/100)")
+        lines.append(f"[ Harga  ] Rp {close:,.0f}")
 
         if final.get('entry_low') and final.get('entry_high'):
-            lines.append(f"   📈 Entry   : Rp {final['entry_low']:,.0f} - {final['entry_high']:,.0f}")
+            lines.append(f"[ Entry  ] Rp {final['entry_low']:,.0f} - {final['entry_high']:,.0f}")
             target = final.get('target', 0)
             stoploss = final.get('stoploss', 0)
-            tp_pct = ((target - close) / close * 100) if close > 0 and target > 0 else 0
+            
+            # Using actual TP1/TP2 if available from score, else derived from AI target
+            tp1 = score.get('tp1', target)
+            tp2 = score.get('tp2', tp1 * 1.05) if tp1 else 0
+            
+            tp1_pct = ((tp1 - close) / close * 100) if close > 0 and tp1 > 0 else 0
+            tp2_pct = ((tp2 - close) / close * 100) if close > 0 and tp2 > 0 else 0
             cl_pct = ((stoploss - close) / close * 100) if close > 0 and stoploss > 0 else 0
-            lines.append(f"   🎯 TP: Rp {target:,.0f} ({tp_pct:+.1f}%)")
-            lines.append(f"   🛡️ CL: Rp {stoploss:,.0f} ({cl_pct:+.1f}%)")
+            
+            lines.append(f"[ TP1    ] Rp {tp1:,.0f} ({tp1_pct:+.1f}%)")
+            lines.append(f"[ TP2    ] Rp {tp2:,.0f} ({tp2_pct:+.1f}%)")
+            lines.append(f"[ SL     ] Rp {stoploss:,.0f} ({cl_pct:+.1f}%)")
             if final.get('rr_ratio'):
-                lines.append(f"   ⚖️ R/R     : 1 : {final['rr_ratio']:.1f}")
+                lines.append(f"[ R/R    ] 1 : {final['rr_ratio']:.1f}")
 
         if final.get('alasan'):
-            lines.append(f"   🔍 {final['alasan'][:120]}")
-        lines.append(f"   📊 Confidence: {conf}%")
-        lines.append("───────────────────────")
+            lines.append(f"🔍 {final['alasan'][:120]}")
+        lines.append(f"📊 Confidence: {conf}%")
 
     # Track record
     if track and track.get('total_trades', 0) > 0:
@@ -239,16 +248,27 @@ def format_sinyal_sore(analysis_result: dict, review_pagi: dict = None) -> str:
         emoji = _emoji_label(label)
         total = score.get('total', 0)
 
-        lines.append(f"\n{i}. <b>{kode}</b> {emoji} {label} ({total}/100) | /c_{kode}")
+        lines.append("")
+        lines.append(f"{i}. <b>{kode}</b>  |  /c_{kode}")
+        lines.append("─────────────────────")
+        lines.append(f"[ Status ] {emoji} {label} ({total}/100)")
 
         if final.get('entry_low'):
-            lines.append(f"   📈 Entry: Rp {final['entry_low']:,.0f}-{final['entry_high']:,.0f}")
-            lines.append(f"   🎯 Target: Rp {final.get('target', 0):,.0f} | SL: Rp {final.get('stoploss', 0):,.0f}")
+            entry = f"Rp {final['entry_low']:,.0f} - {final.get('entry_high', final['entry_low']):,.0f}"
+            lines.append(f"[ Entry  ] {entry}")
+            
+            target = final.get('target', 0)
+            tp1 = score.get('tp1', target)
+            tp2 = score.get('tp2', tp1 * 1.05) if tp1 else 0
+            
+            lines.append(f"[ TP1    ] Rp {tp1:,.0f}")
+            lines.append(f"[ TP2    ] Rp {tp2:,.0f}")
+            lines.append(f"[ SL     ] Rp {final.get('stoploss', 0):,.0f}")
 
         if debate.get('bull_arguments'):
-            lines.append(f"   📈 Bull: {debate['bull_arguments'][0][:80]}")
+            lines.append(f"📈 Bull: {debate['bull_arguments'][0][:80]}")
         if debate.get('bear_arguments'):
-            lines.append(f"   📉 Bear: {debate['bear_arguments'][0][:80]}")
+            lines.append(f"📉 Bear: {debate['bear_arguments'][0][:80]}")
 
     lines.extend([
         "",
@@ -284,14 +304,16 @@ def format_swing(swing_results: list) -> str:
         vol_ratio = r.get('vol_ratio', 0)
 
         lines.append("")
-        lines.append(f"{rank_emoji.get(i, f'{i}.')} <b>{kode}</b> | Skor Swing: {score} | /c_{kode}")
-        lines.append(f"   💰 Harga: Rp {close:,.0f} | Vol Accum: {vol_ratio:.1f}x")
-        lines.append(f"   📈 Entry: Rp {r.get('entry', close):,.0f}")
-        lines.append(f"   🎯 TP1: Rp {r['tp1']:,.0f} ({r['tp1_pct']:+.1f}%) | TP2: Rp {r['tp2']:,.0f} ({r['tp2_pct']:+.1f}%)")
-        lines.append(f"   🛡️ CL: Rp {r['cl']:,.0f} ({r['cl_pct']:+.1f}%)")
+        lines.append(f"{rank_emoji.get(i, f'{i}.')} <b>{kode}</b>  |  /c_{kode}")
+        lines.append("─────────────────────")
+        lines.append(f"[ Status ] 🌊 Swing ({score} pt)")
+        lines.append(f"[ Harga  ] Rp {close:,.0f} (Vol: {vol_ratio:.1f}x)")
+        lines.append(f"[ Entry  ] Rp {r.get('entry', close):,.0f}")
+        lines.append(f"[ TP1    ] Rp {r['tp1']:,.0f} ({r['tp1_pct']:+.1f}%)")
+        lines.append(f"[ TP2    ] Rp {r['tp2']:,.0f} ({r['tp2_pct']:+.1f}%)")
+        lines.append(f"[ SL     ] Rp {r['cl']:,.0f} ({r['cl_pct']:+.1f}%)")
         if r.get('rr_ratio'):
-            lines.append(f"   ⚖️ R/R: 1 : {r['rr_ratio']:.1f}")
-        lines.append("───────────────────────")
+            lines.append(f"[ R/R    ] 1 : {r['rr_ratio']:.1f}")
 
     lines.extend([
         "",
@@ -329,12 +351,14 @@ def format_bsjp(bsjp_results: list) -> str:
         daily_chg = r.get('daily_change', 0)
 
         lines.append("")
-        lines.append(f"{rank_emoji.get(i, f'{i}.')} <b>{kode}</b> | Skor: {score} | /c_{kode}")
-        lines.append(f"   💰 Harga: Rp {close:,.0f} ({daily_chg:+.1%}) | Vol: {vol_ratio:.1f}x")
-        lines.append(f"   📈 Entry: Rp {r.get('entry', close):,.0f}")
-        lines.append(f"   🎯 TP1: Rp {r['tp1']:,.0f} ({r['tp1_pct']:+.1f}%) | TP2: Rp {r['tp2']:,.0f} ({r['tp2_pct']:+.1f}%)")
-        lines.append(f"   🛡️ CL: Rp {r['cl']:,.0f} ({r['cl_pct']:+.1f}%)")
-        lines.append("───────────────────────")
+        lines.append(f"{rank_emoji.get(i, f'{i}.')} <b>{kode}</b>  |  /c_{kode}")
+        lines.append("─────────────────────")
+        lines.append(f"[ Status ] 🎇 BSJP ({score} pt)")
+        lines.append(f"[ Harga  ] Rp {close:,.0f} ({daily_chg:+.1%})")
+        lines.append(f"[ Entry  ] Rp {r.get('entry', close):,.0f}")
+        lines.append(f"[ TP1    ] Rp {r['tp1']:,.0f} ({r['tp1_pct']:+.1f}%)")
+        lines.append(f"[ TP2    ] Rp {r['tp2']:,.0f} ({r['tp2_pct']:+.1f}%)")
+        lines.append(f"[ SL     ] Rp {r['cl']:,.0f} ({r['cl_pct']:+.1f}%)")
 
     lines.extend([
         "",

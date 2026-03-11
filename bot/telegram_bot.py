@@ -186,13 +186,13 @@ async def job_update_siang(context: ContextTypes.DEFAULT_TYPE):
 
         today = date.today().isoformat()
         
-        # 1. Ambil target pagi (hanya Top 10)
+        # 1. Ambil target pagi dari sinyal_history (Top 10)
         rows = db.execute(
-            "SELECT kode, close, tp1, tp2, cl FROM watchlist_harian WHERE tanggal = ? ORDER BY ranking ASC LIMIT 10",
+            "SELECT kode, entry_high as base_close, target as tp1, stoploss as cl FROM sinyal_history WHERE tanggal = ? AND status = 'ACTIVE' ORDER BY skor_total DESC LIMIT 10",
             (today,)
         )
         if not rows:
-            logger.warning("Tidak ada data watchlist pagi untuk di update siang ini.")
+            logger.warning("Tidak ada data sinyal_history pagi untuk di update siang ini.")
             return
 
         candidates = [r['kode'] for r in rows]
@@ -208,14 +208,15 @@ async def job_update_siang(context: ContextTypes.DEFAULT_TYPE):
                 "SELECT close FROM harga_historis WHERE kode = ? ORDER BY tanggal DESC LIMIT 1",
                 (kode,)
             )
-            live_close = live_data[0]['close'] if live_data else r['close']
+            live_close = live_data[0]['close'] if live_data else r['base_close']
+            tp2 = round(r['tp1'] * 1.05) if r['tp1'] else 0
             
             results.append({
                 'kode': kode,
-                'entry_low': r['close'], # Harga rujukan pagi
+                'entry_low': r['base_close'], # Harga rujukan pagi
                 'close': live_close,     # Harga update siang
                 'tp1': r['tp1'],
-                'tp2': r['tp2'],
+                'tp2': tp2,
                 'cl': r['cl']
             })
             
@@ -335,6 +336,15 @@ async def job_full_market_scan(context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"JOB scanner error: {e}")
         await send_message(f"⚠️ Error scanner: {str(e)[:200]}", context.bot)
 
+async def job_auto_alert(context: ContextTypes.DEFAULT_TYPE):
+    """Setiap 15 menit jam kerja — Cek TP/SL untuk Portofolio & Sinyal."""
+    logger.info("⏰ JOB: Auto-Target Alert")
+    try:
+        from scheduler.auto_alert import run_auto_target_alert
+        from config.settings import TELEGRAM_CHAT_ID
+        run_auto_target_alert(context.bot, TELEGRAM_CHAT_ID)
+    except Exception as e:
+        logger.error(f"JOB auto alert error: {e}")
 
 # ═══════════════════════════════════════════════════════
 # BUILD APPLICATION
@@ -366,6 +376,9 @@ async def post_init(application):
     # Setiap 2 jam: fetch news
     scheduler.add_job(_wrap, trigger=CronTrigger(hour='6,8,10,12,14,16,18,20,22'), args=[job_fetch_news, bot], name='fetch_news')
 
+    # Auto-Target Alert (Tiap 15 Menit hari kerja 09:00 - 15:45)
+    scheduler.add_job(_wrap, trigger=CronTrigger(day_of_week='mon-fri', hour='9-15', minute='0,15,30,45'), args=[job_auto_alert, bot], name='auto_alert')
+
     # Setiap hari: fundamental & Full Market Scan jam 21:00 - 22:00
     scheduler.add_job(_wrap, trigger=CronTrigger(hour=21, minute=0, day_of_week='mon-fri'), args=[job_full_market_scan, bot], name='full_market_scan')
     scheduler.add_job(_wrap, trigger=CronTrigger(hour=22, minute=0), args=[job_fetch_fundamental, bot], name='fetch_fundamental')
@@ -387,7 +400,7 @@ def build_app():
         cmd_jual, cmd_track, cmd_setting, handle_button_text,
         cmd_fetch_macro, cmd_fetch_ohlcv, cmd_fetch_fundamental, cmd_fetch_news,
         cmd_scanner, handle_callback_query, cmd_quick_chart, cmd_quick_analisa,
-        cmd_sinyal, cmd_bsjp, cmd_swing
+        cmd_sinyal, cmd_bsjp, cmd_swing, cmd_performance_check
     )
 
     commands = [
@@ -410,6 +423,7 @@ def build_app():
         ("sinyal", cmd_sinyal),
         ("bsjp", cmd_bsjp),
         ("swing", cmd_swing),
+        ("performa", cmd_performance_check),
     ]
     for name, handler in commands:
         app.add_handler(CommandHandler(name, handler))
