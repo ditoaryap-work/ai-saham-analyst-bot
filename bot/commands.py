@@ -124,7 +124,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• Sinyal otomatis 3x/hari\n\n"
         "👇 *Gunakan tombol di bawah untuk mulai:*"
     )
-    await update.message.reply_text(text, parse_mode='Markdown', reply_markup=MAIN_KEYBOARD)
+    await update.message.reply_text(text, parse_mode='HTML', reply_markup=MAIN_KEYBOARD)
 
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -151,9 +151,9 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "💡 *Atau gunakan tombol menu di bawah!*"
     )
     if update.message:
-        await update.message.reply_text(text, parse_mode='Markdown', reply_markup=MAIN_KEYBOARD)
+        await update.message.reply_text(text, parse_mode='HTML', reply_markup=MAIN_KEYBOARD)
     elif update.callback_query:
-        await update.callback_query.message.reply_text(text, parse_mode='Markdown', reply_markup=MAIN_KEYBOARD)
+        await update.callback_query.message.reply_text(text, parse_mode='HTML', reply_markup=MAIN_KEYBOARD)
 
 
 async def cmd_sinyal(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -178,13 +178,13 @@ async def cmd_sinyal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         results.sort(key=lambda x: x['total'], reverse=True)
 
         tanggal_sekarang = datetime.now(pytz.timezone('Asia/Jakarta')).strftime('%d %B %Y | %H:%M WIB')
-        lines = [f"🎯 *SINYAL HARI INI* — {tanggal_sekarang}\n_{source_text}_\n"]
+        lines = [f"🎯 <b>SINYAL HARI INI</b> — {tanggal_sekarang}\n<i>{source_text}</i>\n"]
         rank_emoji = {1: "1️⃣", 2: "2️⃣", 3: "3️⃣", 4: "4️⃣", 5: "5️⃣", 6: "6️⃣", 7: "7️⃣", 8: "8️⃣", 9: "9️⃣", 10: "🔟"}
 
         for i, r in enumerate(results, 1):
             e = r.get('emoji', '❓')
             lines.append(
-                f"{rank_emoji.get(i, str(i)+'.')} *{r['kode']}* {e} {r['label']} ({r['total']:.1f} pt) | /c_{r['kode']}"
+                f"{rank_emoji.get(i, str(i)+'.')} <b>{r['kode']}</b> {e} {r['label']} ({r['total']:.1f} pt) | /c_{r['kode']}"
             )
 
         lines.append("\n💡 Klik tulisan biru (misal /c_BBCA) untuk lihat Chart & Analisa")
@@ -201,8 +201,8 @@ async def cmd_sinyal(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await context.bot.send_photo(
                             chat_id=update.effective_chat.id,
                             photo=photo,
-                            caption=f"📈 Chart Top #1 Pilihan AI: *{top_kode}*",
-                            parse_mode="Markdown"
+                            caption=f"📈 Chart Top #1 Pilihan AI: <b>{top_kode}</b>",
+                            parse_mode="HTML"
                         )
                 except Exception as e:
                     logger.error(f"Gagal mengirim chart top_kode {top_kode}: {e}")
@@ -211,7 +211,7 @@ async def cmd_sinyal(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     if os.path.exists(chart_path):
                         os.remove(chart_path)
 
-        await update.message.reply_text(text, parse_mode='Markdown', reply_markup=MAIN_KEYBOARD)
+        await update.message.reply_text(text, parse_mode='HTML', reply_markup=MAIN_KEYBOARD)
     except Exception as e:
         logger.error(f"Error sinyal: {e}")
         await update.message.reply_text(f"❌ Error: {str(e)[:100]}", reply_markup=MAIN_KEYBOARD)
@@ -243,7 +243,7 @@ async def cmd_analisa(update: Update, context: ContextTypes.DEFAULT_TYPE):
     kode = context.args[0].upper()
     await update.message.reply_text(
         f"🔍 Menganalisa *{kode}*...\n⏳ 5 Agent AI sedang bekerja (30-60 detik)",
-        parse_mode='Markdown', reply_markup=MAIN_KEYBOARD,
+        parse_mode='HTML', reply_markup=MAIN_KEYBOARD,
     )
 
     try:
@@ -263,8 +263,8 @@ async def cmd_analisa(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await context.bot.send_photo(
                             chat_id=update.effective_chat.id,
                             photo=photo,
-                            caption=f"📈 *{kode}* — Auto-Chart (EMA, BB, Volume, MACD, StochRSI)",
-                            parse_mode="Markdown"
+                            caption=f"📈 <b>{kode}</b> — Auto-Chart (EMA, BB, Volume, MACD, StochRSI)",
+                            parse_mode="HTML"
                         )
                 except Exception as e:
                     logger.error(f"Gagal mengirim chart {kode}: {e}")
@@ -280,7 +280,7 @@ async def cmd_analisa(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Error analisa {kode}: {e}")
         text = f"❌ Error analisa {kode}: {str(e)[:150]}"
 
-    await update.message.reply_text(text, parse_mode='Markdown', reply_markup=MAIN_KEYBOARD)
+    await update.message.reply_text(text, parse_mode='HTML', reply_markup=MAIN_KEYBOARD)
 
 
 async def cmd_bandingkan(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -317,9 +317,9 @@ async def cmd_bandingkan(update: Update, context: ContextTypes.DEFAULT_TYPE):
         s1 = signals.get(k1, {}).get('score', {}).get('total', 0)
         s2 = signals.get(k2, {}).get('score', {}).get('total', 0)
         winner = k1 if s1 > s2 else k2
-        lines.append(f"🏆 *Pemenang: {winner}*")
+        lines.append(f"🏆 <b>Pemenang: {winner}</b>")
 
-        await update.message.reply_text("\n".join(lines), parse_mode='Markdown', reply_markup=MAIN_KEYBOARD)
+        await update.message.reply_text("\n".join(lines), parse_mode='HTML', reply_markup=MAIN_KEYBOARD)
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {str(e)[:100]}", reply_markup=MAIN_KEYBOARD)
 
@@ -348,7 +348,7 @@ async def cmd_market(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Gold      : {m.get('gold_change', 0):+.2%}\n"
             f"Oil       : {m.get('oil_change', 0):+.2%}"
         )
-        await update.message.reply_text(text, parse_mode='Markdown', reply_markup=MAIN_KEYBOARD)
+        await update.message.reply_text(text, parse_mode='HTML', reply_markup=MAIN_KEYBOARD)
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {str(e)[:100]}", reply_markup=MAIN_KEYBOARD)
 
@@ -384,7 +384,7 @@ async def cmd_pnl(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if track['total_trades'] > 0:
             text += f"\nRealized: Rp {track['total_pnl']:,.0f}"
 
-        await update.message.reply_text(text, parse_mode='Markdown', reply_markup=MAIN_KEYBOARD)
+        await update.message.reply_text(text, parse_mode='HTML', reply_markup=MAIN_KEYBOARD)
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {str(e)[:100]}", reply_markup=MAIN_KEYBOARD)
 
@@ -415,7 +415,7 @@ async def cmd_beli(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             text = f"❌ {result['error']}"
 
-        await update.message.reply_text(text, parse_mode='Markdown', reply_markup=MAIN_KEYBOARD)
+        await update.message.reply_text(text, parse_mode='HTML', reply_markup=MAIN_KEYBOARD)
     except (ValueError, IndexError):
         await update.message.reply_text("⚠️ Format salah. Contoh: /beli BBCA 10 9200", reply_markup=MAIN_KEYBOARD)
 
@@ -448,7 +448,7 @@ async def cmd_jual(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             text = f"❌ {result['error']}"
 
-        await update.message.reply_text(text, parse_mode='Markdown', reply_markup=MAIN_KEYBOARD)
+        await update.message.reply_text(text, parse_mode='HTML', reply_markup=MAIN_KEYBOARD)
     except (ValueError, IndexError):
         await update.message.reply_text("⚠️ Format salah. Contoh: /jual BBCA 10 9400", reply_markup=MAIN_KEYBOARD)
 
@@ -475,7 +475,7 @@ async def cmd_setting(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("📖 Baca Panduan Lengkap (/help)", callback_data="help")]
     ])
-    await update.message.reply_text(text, parse_mode='Markdown', reply_markup=keyboard)
+    await update.message.reply_text(text, parse_mode='HTML', reply_markup=keyboard)
 
 
 async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):

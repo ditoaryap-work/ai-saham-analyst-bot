@@ -77,8 +77,8 @@ async def send_top_chart(result_data: dict, bot: Bot, chat_id: str = None):
                 await bot.send_photo(
                     chat_id=cid,
                     photo=photo,
-                    caption=f"📈 Chart Top #1 Pilihan AI: *{top_kode}*",
-                    parse_mode="Markdown"
+                    caption=f"📈 Chart Top #1 Pilihan AI: <b>{top_kode}</b>",
+                    parse_mode='HTML'
                 )
         except Exception as e:
             logger.error(f"Gagal send top chart {top_kode}: {e}")
@@ -103,7 +103,17 @@ async def job_briefing_pagi(context: ContextTypes.DEFAULT_TYPE):
         from config.settings import TEST_STOCKS
 
         fetch_and_save_macro()
-        result = run_full_analysis(TEST_STOCKS)
+
+        # Ambil Top 5-10 dari scan market terakhir
+        rows = db.execute("SELECT kode FROM watchlist_harian ORDER BY tanggal DESC LIMIT 10")
+        if rows:
+            stocks = [r['kode'] for r in rows]
+            logger.info(f"Using {len(stocks)} stocks from watchlist_harian for briefing")
+        else:
+            stocks = TEST_STOCKS
+            logger.warning("Watchlist harian kosong, menggunakan TEST_STOCKS")
+
+        result = run_full_analysis(stocks)
         result['track_record'] = get_track_record(30)
         
         # Kirim chart top #1 dulu
@@ -140,7 +150,16 @@ async def job_sinyal_sore(context: ContextTypes.DEFAULT_TYPE):
         from bot.formatter import format_sinyal_sore
         from config.settings import TEST_STOCKS
 
-        result = run_full_analysis(TEST_STOCKS)
+        # Ambil Top 5-10 dari scan market terakhir
+        rows = db.execute("SELECT kode FROM watchlist_harian ORDER BY tanggal DESC LIMIT 10")
+        if rows:
+            stocks = [r['kode'] for r in rows]
+            logger.info(f"Using {len(stocks)} stocks from watchlist_harian for sinyal sore")
+        else:
+            stocks = TEST_STOCKS
+            logger.warning("Watchlist harian kosong, menggunakan TEST_STOCKS")
+
+        result = run_full_analysis(stocks)
         
         # Kirim chart top #1 dulu
         await send_top_chart(result, context.bot)

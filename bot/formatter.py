@@ -67,7 +67,7 @@ def format_briefing_pagi(analysis_result: dict) -> str:
     # Top signals
     lines.extend([
         "━━━━━━━━━━━━━━━━━━━━━━",
-        "🎯 TOP SINYAL HARI INI",
+        "🎯 <b>TOP SINYAL HARI INI</b>",
         "━━━━━━━━━━━━━━━━━━━━━━",
     ])
 
@@ -91,7 +91,7 @@ def format_briefing_pagi(analysis_result: dict) -> str:
         conf = final.get('confidence', debate.get('confidence', 0))
 
         lines.append("")
-        lines.append(f"{rank_emoji.get(i, f'{i}.')} *{kode}* {emoji} {label} | Skor: {total}/100 | /c_{kode}")
+        lines.append(f"{rank_emoji.get(i, f'{i}.')} <b>{kode}</b> {emoji} {label} | Skor: {total}/100 | /c_{kode}")
         lines.append(f"   💰 Harga   : Rp {close:,.0f}")
 
         if final.get('entry_low') and final.get('entry_high'):
@@ -233,7 +233,7 @@ def format_sinyal_sore(analysis_result: dict, review_pagi: dict = None) -> str:
         emoji = _emoji_label(label)
         total = score.get('total', 0)
 
-        lines.append(f"\n{i}. *{kode}* {emoji} {label} ({total}/100) | /c_{kode}")
+        lines.append(f"\n{i}. <b>{kode}</b> {emoji} {label} ({total}/100) | /c_{kode}")
 
         if final.get('entry_low'):
             lines.append(f"   📈 Entry: Rp {final['entry_low']:,.0f}-{final['entry_high']:,.0f}")
@@ -273,10 +273,10 @@ def format_analisa(kode: str, data: dict) -> str:
     emoji = _emoji_label(label)
 
     lines = [
-        f"📊 ANALISA {kode} — {_tanggal()}",
+        f"📊 ANALISA <b>{kode}</b> — {_tanggal()}",
         "━━━━━━━━━━━━━━━━━━━━━━",
         f"",
-        f"{emoji} {kode} → {label} ({score.get('total', 0)}/100)",
+        f"{emoji} <b>{kode}</b> → {label} ({score.get('total', 0)}/100)",
         f"💰 Harga: Rp {score.get('close', 0):,.0f}",
         "",
         "📊 SCORING BREAKDOWN:",
@@ -320,7 +320,7 @@ def format_analisa(kode: str, data: dict) -> str:
 def format_portfolio(summary: dict) -> str:
     """Format /portfolio response."""
     lines = [
-        "💼 PORTFOLIO",
+        "<b>💼 PORTFOLIO</b>",
         "━━━━━━━━━━━━━━━━━━━━━━",
         f"💰 Total   : Rp {summary.get('total', 0):,.0f}",
         f"💵 Cash    : Rp {summary.get('cash', 0):,.0f}",
@@ -346,7 +346,7 @@ def format_portfolio(summary: dict) -> str:
 def format_track_record(track: dict) -> str:
     """Format /track response."""
     lines = [
-        "📈 TRACK RECORD (30 hari)",
+        "<b>📈 TRACK RECORD (30 hari)</b>",
         "━━━━━━━━━━━━━━━━━━━━━━",
         f"Total trades : {track.get('total_trades', 0)}",
         f"Hit rate     : {track.get('hit_rate', 0):.0%} ({track.get('wins', 0)}/{track.get('total_trades', 0)})",
