@@ -46,7 +46,7 @@ from ai.sentiment import process_unprocessed_news
 MAIN_KEYBOARD = ReplyKeyboardMarkup(
     [
         [KeyboardButton("📊 Market"), KeyboardButton("🎯 Sinyal Hari Ini")],
-        [KeyboardButton("🌆 BSJP Sore"), KeyboardButton("📈 Track Record")],
+        [KeyboardButton("🌆 BSJP Sore"), KeyboardButton("🌊 Swing Trade")],
         [KeyboardButton("💼 Portfolio"), KeyboardButton("⚙️ Setting")],
     ],
     resize_keyboard=True,
@@ -95,6 +95,8 @@ async def handle_button_text(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
     elif text == "🌆 BSJP Sore":
         await cmd_bsjp(update, context)
+    elif text == "🌊 Swing Trade":
+        await cmd_swing(update, context)
     elif text == "⚙️ Setting":
         await cmd_setting(update, context)
     else:
@@ -133,15 +135,18 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Daftar command."""
     text = (
         "📖 *PANDUAN COMMAND*\n\n"
-        "*Analisa:*\n"
-        "/analisa `KODE` — Analisa 5-agent AI\n"
+        "*Analisa & Sinyal:*\n"
+        "/a_`KODE` — Analisa AI lengkap (contoh: /a_BBCA)\n"
+        "/c_`KODE` — Chart teknikal saja (contoh: /c_BBCA)\n"
         "/bandingkan `K1 K2` — Bandingkan 2 saham\n"
-        "/sinyal — Sinyal Top 10 harian\n"
-        "/market — Kondisi pasar\n\n"
+        "/sinyal — Sinyal Pagi (Hold harian)\n"
+        "/bsjp — Sinyal BSJP (Beli sore jual pagi)\n"
+        "/swing — Sinyal Swing (Hold 3-7 hari)\n"
+        "/market — Kondisi pasar IHSG & Global\n\n"
         "*Portfolio:*\n"
-        "/portfolio — Lihat posisi\n"
-        "/pnl — P&L hari ini\n"
-        "/beli `KODE LOT HARGA` — Input beli\n"
+        "/portfolio — Lihat posisi berjalan\n"
+        "/pnl — Profit & Loss hari ini\n"
+        "/beli `KODE LOT HARGA` — Input posisi beli\n"
         "/jual `KODE LOT HARGA` — Input jual\n"
         "/track — Track record 30 hari\n\n"
         "🛠 *Admin/Manual Fetch:*\n"
@@ -282,6 +287,65 @@ async def cmd_bsjp(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Error BSJP: {e}")
         await update.message.reply_text(f"❌ Error BSJP: {str(e)[:100]}", reply_markup=MAIN_KEYBOARD)
+
+
+async def cmd_swing(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Swing Trade (Hold 3-7 hari) — Trend following & Accumulation screening."""
+    await update.message.reply_text(
+        "🌊 <b>Scanning Swing Trade...</b>\n⏳ Menganalisa seluruh market untuk mid-term trend (3-8 menit)",
+        parse_mode='HTML', reply_markup=MAIN_KEYBOARD
+    )
+
+    try:
+        from analysis.swing_screening import run_swing_screening, save_swing_watchlist, get_swing_candidates
+        from data.fetcher.stock_fetcher import fetch_and_save_batch
+        from bot.formatter import format_swing
+
+        # Step 1: Ambil daftar kandidat (high value)
+        candidates = get_swing_candidates(150)
+
+        # Step 2: Download data OHLCV FRESH hari ini
+        logger.info(f"Swing: Fetching fresh OHLCV for {len(candidates)} candidates...")
+        fetch_and_save_batch(candidates, include_info=False)
+
+        # Step 3: Scan dengan data fresh
+        results = run_swing_screening(candidates)
+        
+        if not results:
+            await update.message.reply_text(
+                "❌ Tidak ada kandidat Swing Trade yang memenuhi kriteria kuat hari ini.",
+                reply_markup=MAIN_KEYBOARD
+            )
+            return
+
+        save_swing_watchlist(results)
+
+        # Kirim chart top #1
+        top_kode = results[0]['kode']
+        from utils.chart_generator import generate_advanced_chart
+        chart_path = generate_advanced_chart(top_kode, days=150) # Lebih panjang untuk lihat trend
+        if chart_path:
+            try:
+                with open(chart_path, 'rb') as photo:
+                    await context.bot.send_photo(
+                        chat_id=update.effective_chat.id,
+                        photo=photo,
+                        caption=f"📈 Swing Top #1: <b>{top_kode}</b>",
+                        parse_mode="HTML"
+                    )
+            except Exception as e:
+                logger.error(f"Gagal mengirim chart Swing {top_kode}: {e}")
+            finally:
+                import os
+                if os.path.exists(chart_path):
+                    os.remove(chart_path)
+
+        text = format_swing(results)
+        await update.message.reply_text(text, parse_mode='HTML', reply_markup=MAIN_KEYBOARD)
+    except Exception as e:
+        logger.error(f"Error Swing: {e}")
+        await update.message.reply_text(f"❌ Error Swing: {str(e)[:100]}", reply_markup=MAIN_KEYBOARD)
+
 
 async def cmd_quick_chart(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler untuk /c_KODE -> kirim GAMBAR CHART saja (tanpa AI analysis)."""

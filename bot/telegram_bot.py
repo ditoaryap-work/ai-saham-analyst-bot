@@ -127,33 +127,77 @@ async def job_briefing_pagi(context: ContextTypes.DEFAULT_TYPE):
 
 
 async def job_update_siang(context: ContextTypes.DEFAULT_TYPE):
-    """12:00 — Update status sinyal pagi."""
-    logger.info("⏰ JOB: Update Siang")
+    """12:00 — Evaluasi/alert portfolio di jam istirahat."""
+    logger.info("⏰ JOB: Update Siang (Cek Sinyal Pagi)")
     try:
         from bot.formatter import format_update_siang
-        from portfolio.tracker import get_portfolio_summary, check_alerts
+        from data.database import db
+        from data.fetcher.stock_fetcher import fetch_and_save_batch
+        from datetime import date
 
-        summary = get_portfolio_summary()
-        alerts = check_alerts()
-        text = format_update_siang({}, {'alerts': alerts})
+        today = date.today().isoformat()
+        
+        # 1. Ambil target pagi (hanya Top 10)
+        rows = db.execute(
+            "SELECT kode, close, tp1, tp2, cl FROM watchlist_harian WHERE tanggal = ? ORDER BY ranking ASC LIMIT 10",
+            (today,)
+        )
+        if not rows:
+            logger.warning("Tidak ada data watchlist pagi untuk di update siang ini.")
+            return
+
+        candidates = [r['kode'] for r in rows]
+        
+        # 2. Ambil harga live (fresh fetch jam 12:00)
+        fetch_and_save_batch(candidates, include_info=False)
+        
+        results = []
+        for r in rows:
+            kode = r['kode']
+            # Ambil close terbaru yang baru saja di fetch
+            live_data = db.execute(
+                "SELECT close FROM harga_historis WHERE kode = ? ORDER BY tanggal DESC LIMIT 1",
+                (kode,)
+            )
+            live_close = live_data[0]['close'] if live_data else r['close']
+            
+            results.append({
+                'kode': kode,
+                'entry_low': r['close'], # Harga rujukan pagi
+                'close': live_close,     # Harga update siang
+                'tp1': r['tp1'],
+                'tp2': r['tp2'],
+                'cl': r['cl']
+            })
+            
+        text = format_update_siang(results)
         await send_message(text, context.bot)
+        logger.info(f"✅ Update Siang broadcast selesai untuk {len(results)} saham")
     except Exception as e:
         logger.error(f"JOB siang error: {e}")
         await send_message(f"⚠️ Error update siang: {str(e)[:200]}", context.bot)
 
+async def job_bsjp_fetch(context: ContextTypes.DEFAULT_TYPE):
+    """14:30 — Download fresh data 800 emiten buat persiapan BSJP."""
+    logger.info("⏰ JOB: BSJP Fresh Market Data Fetch")
+    await send_message("⏳ <b>Persiapan BSJP Sore:</b>\nMengunduh data terbaru untuk seluruh saham...", context.bot)
+    try:
+        from data.fetcher.stock_fetcher import get_all_stock_codes, fetch_and_save_batch
+        codes = get_all_stock_codes()
+        fetch_and_save_batch(codes, include_info=False)
+        logger.info("✅ BSJP fresh data download complete")
+    except Exception as e:
+        logger.error(f"JOB BSJP Fetch error: {e}")
 
-async def job_bsjp_sore(context: ContextTypes.DEFAULT_TYPE):
-    """15:00-15:45 — BSJP pipeline: fetch fresh data, scan, broadcast."""
-    logger.info("⏰ JOB: BSJP Sore (Fetch + Scan + Broadcast)")
+async def job_bsjp_broadcast(context: ContextTypes.DEFAULT_TYPE):
+    """15:00 — Screen BSJP & Broadcast."""
+    logger.info("⏰ JOB: BSJP Sore (Scan + Broadcast)")
     try:
         from analysis.bsjp_screening import run_bsjp_screening, save_bsjp_watchlist, get_bsjp_candidates
-        from data.fetcher.stock_fetcher import fetch_and_save_batch
         from bot.formatter import format_bsjp
 
-        # Step 1: Fetch OHLCV fresh untuk kandidat
-        logger.info("📊 BSJP: Fetching fresh OHLCV data...")
+        # Ambil Top 200 kandidat aja dari 800
         candidates = get_bsjp_candidates(200)
-        fetch_and_save_batch(candidates, include_info=False)
         
         # Step 2: Quick scan BSJP
         logger.info("🔍 BSJP: Running quick screening...")
@@ -261,8 +305,13 @@ async def post_init(application):
 
     # Senin-Jumat
     scheduler.add_job(_wrap, trigger=CronTrigger(hour=7, minute=0, day_of_week='mon-fri'), args=[job_briefing_pagi, bot], name='briefing_pagi')
+    scheduler.add_job(_wrap, trigger=CronTrigger(hour=7, minute=30, day_of_week='mon'), args=[job_swing_pagi, bot], name='swing_senin')
     scheduler.add_job(_wrap, trigger=CronTrigger(hour=12, minute=0, day_of_week='mon-fri'), args=[job_update_siang, bot], name='update_siang')
-    scheduler.add_job(_wrap, trigger=CronTrigger(hour=15, minute=15, day_of_week='mon-fri'), args=[job_bsjp_sore, bot], name='bsjp_sore')
+    
+    # BSJP Pipeline
+    scheduler.add_job(_wrap, trigger=CronTrigger(hour=14, minute=30, day_of_week='mon-fri'), args=[job_bsjp_fetch, bot], name='bsjp_fetch')
+    scheduler.add_job(_wrap, trigger=CronTrigger(hour=15, minute=0, day_of_week='mon-fri'), args=[job_bsjp_broadcast, bot], name='bsjp_broadcast')
+    
     scheduler.add_job(_wrap, trigger=CronTrigger(hour=16, minute=30, day_of_week='mon-fri'), args=[job_fetch_ohlcv, bot], name='fetch_ohlcv')
 
     # Setiap 2 jam: fetch news
@@ -289,7 +338,7 @@ def build_app():
         cmd_jual, cmd_track, cmd_setting, handle_button_text,
         cmd_fetch_macro, cmd_fetch_ohlcv, cmd_fetch_fundamental, cmd_fetch_news,
         cmd_scanner, handle_callback_query, cmd_quick_chart, cmd_quick_analisa,
-        cmd_sinyal, cmd_bsjp
+        cmd_sinyal, cmd_bsjp, cmd_swing
     )
 
     commands = [
@@ -311,6 +360,7 @@ def build_app():
         ("scanner", cmd_scanner),
         ("sinyal", cmd_sinyal),
         ("bsjp", cmd_bsjp),
+        ("swing", cmd_swing),
     ]
     for name, handler in commands:
         app.add_handler(CommandHandler(name, handler))
