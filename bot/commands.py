@@ -503,7 +503,7 @@ async def cmd_market(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Kondisi pasar mengunduh data terbaru secara real-time."""
     message = await update.message.reply_text(
         "⏳ <b>Mengambil data pasar terbaru...</b>\nMohon tunggu beberapa detik.",
-        parse_mode='HTML', reply_markup=MAIN_KEYBOARD
+        parse_mode='HTML'
     )
     
     try:
@@ -515,8 +515,13 @@ async def cmd_market(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.info("Market Command: Fetching fresh macro data...")
         m = fetch_and_save_macro()
         
+        try:
+            await message.delete()
+        except:
+            pass
+
         if not m:
-            await message.edit_text("❌ Gagal mengunduh data makro.")
+            await update.message.reply_text("❌ Gagal mengunduh data makro.", reply_markup=MAIN_KEYBOARD)
             return
 
         label = m.get('market_label', 'UNKNOWN')
@@ -536,10 +541,14 @@ async def cmd_market(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Gold      : {m.get('gold_change', 0):+.2%}\n"
             f"Oil       : {m.get('oil_change', 0):+.2%}"
         )
-        await message.edit_text(text, parse_mode='HTML')
+        await update.message.reply_text(text, parse_mode='HTML', reply_markup=MAIN_KEYBOARD)
     except Exception as e:
         logger.error(f"Error cmd_market: {e}")
-        await message.edit_text(f"❌ Error: {str(e)[:100]}")
+        try:
+            await message.delete()
+        except:
+            pass
+        await update.message.reply_text(f"❌ Error: {str(e)[:100]}", reply_markup=MAIN_KEYBOARD)
 
 
 async def cmd_portfolio(update: Update, context: ContextTypes.DEFAULT_TYPE):
