@@ -231,6 +231,8 @@ async def cmd_sinyal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🎯 Mengambil rekomendasi Top 10 hari ini...", reply_markup=MAIN_KEYBOARD)
 
     try:
+        from ai.agents import run_full_analysis
+        
         # 1. Cek watchlist_harian terbaru
         rows = db.execute("SELECT kode FROM watchlist_harian ORDER BY tanggal DESC LIMIT 10")
         if rows:
