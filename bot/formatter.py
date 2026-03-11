@@ -96,15 +96,17 @@ def format_briefing_pagi(analysis_result: dict) -> str:
 
         if final.get('entry_low') and final.get('entry_high'):
             lines.append(f"   📈 Entry   : Rp {final['entry_low']:,.0f} - {final['entry_high']:,.0f}")
-            lines.append(f"   🎯 Target  : Rp {final.get('target', 0):,.0f}")
-            lines.append(f"   🛡️ Stoploss: Rp {final.get('stoploss', 0):,.0f}")
+            target = final.get('target', 0)
+            stoploss = final.get('stoploss', 0)
+            tp_pct = ((target - close) / close * 100) if close > 0 and target > 0 else 0
+            cl_pct = ((stoploss - close) / close * 100) if close > 0 and stoploss > 0 else 0
+            lines.append(f"   🎯 TP: Rp {target:,.0f} ({tp_pct:+.1f}%)")
+            lines.append(f"   🛡️ CL: Rp {stoploss:,.0f} ({cl_pct:+.1f}%)")
             if final.get('rr_ratio'):
                 lines.append(f"   ⚖️ R/R     : 1 : {final['rr_ratio']:.1f}")
 
         if final.get('alasan'):
-            lines.append(f"   🔍 Alasan  : {final['alasan'][:120]}")
-        if final.get('risk_warning'):
-            lines.append(f"   ⚠️ Risk    : {final['risk_warning'][:100]}")
+            lines.append(f"   🔍 {final['alasan'][:120]}")
         lines.append(f"   📊 Confidence: {conf}%")
         lines.append("───────────────────────")
 
@@ -247,7 +249,7 @@ def format_sinyal_sore(analysis_result: dict, review_pagi: dict = None) -> str:
     lines.extend([
         "",
         "━━━━━━━━━━━━━━━━━━━━━━",
-        "💬 Klik tulisan biru (misal /c_BBCA) untuk menganalisa",
+        "💬 /c_KODE = Chart | /a_KODE = Analisa AI",
         "⚠️ Bukan rekomendasi keuangan. DYOR selalu.",
     ])
 
@@ -255,8 +257,47 @@ def format_sinyal_sore(analysis_result: dict, review_pagi: dict = None) -> str:
 
 
 # ═══════════════════════════════════════════════════════
-# ON-DEMAND FORMATS
+# 4. BSJP (Beli Sore Jual Pagi)
 # ═══════════════════════════════════════════════════════
+
+def format_bsjp(bsjp_results: list) -> str:
+    """Format output BSJP recommendations."""
+    lines = [
+        f"🌆 <b>SINYAL BSJP</b> — {_tanggal()} | {_jakarta_now().strftime('%H:%M')} WIB",
+        "   (Beli ~15:50 → target jual besok pagi)",
+        "",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        "🎯 <b>TOP BSJP PICKS</b>",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+    ]
+
+    rank_emoji = {1: "1️⃣", 2: "2️⃣", 3: "3️⃣", 4: "4️⃣", 5: "5️⃣",
+                  6: "6️⃣", 7: "7️⃣", 8: "8️⃣", 9: "9️⃣", 10: "🔟"}
+
+    for i, r in enumerate(bsjp_results, 1):
+        kode = r['kode']
+        close = r.get('close', 0)
+        score = r.get('bsjp_score', 0)
+        vol_ratio = r.get('vol_ratio', 0)
+        daily_chg = r.get('daily_change', 0)
+
+        lines.append("")
+        lines.append(f"{rank_emoji.get(i, f'{i}.')} <b>{kode}</b> | Skor: {score} | /c_{kode}")
+        lines.append(f"   💰 Harga: Rp {close:,.0f} ({daily_chg:+.1%}) | Vol: {vol_ratio:.1f}x")
+        lines.append(f"   📈 Entry: Rp {r.get('entry', close):,.0f}")
+        lines.append(f"   🎯 TP1: Rp {r['tp1']:,.0f} ({r['tp1_pct']:+.1f}%) | TP2: Rp {r['tp2']:,.0f} ({r['tp2_pct']:+.1f}%)")
+        lines.append(f"   🛡️ CL: Rp {r['cl']:,.0f} ({r['cl_pct']:+.1f}%)")
+        lines.append("───────────────────────")
+
+    lines.extend([
+        "",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        "⏰ Beli sebelum market tutup (~15:50)",
+        "💬 /c_KODE = Chart | /a_KODE = Analisa AI",
+        "⚠️ Bukan rekomendasi keuangan. DYOR selalu.",
+    ])
+
+    return "\n".join(lines)
 
 def format_analisa(kode: str, data: dict) -> str:
     """Format /analisa [KODE] response."""

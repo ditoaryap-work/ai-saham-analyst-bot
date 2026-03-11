@@ -285,6 +285,54 @@ def calculate_composite_score(kode: str, l2_raw: int = 0, l3_raw: int = 0,
         'close': indicators.get('close', 0) if indicators else 0,
     }
 
+    # Auto-calculate Entry, TP1, TP2, CL from technical indicators
+    if indicators:
+        close = indicators.get('close', 0)
+        s1 = indicators.get('support1', 0)
+        r1 = indicators.get('resist1', 0)
+        atr = indicators.get('atr', 0)
+
+        if close > 0:
+            # Entry zone: antara support1 dan close (atau close - 1% jika support terlalu jauh)
+            entry_low = s1 if s1 and (close - s1) / close < 0.05 else round(close * 0.98)
+            entry_high = close
+
+            # TP1: resistance1 atau close + 1.5x ATR
+            if r1 and r1 > close:
+                tp1 = r1
+            elif atr > 0:
+                tp1 = round(close + atr * 1.5)
+            else:
+                tp1 = round(close * 1.05)
+
+            # TP2: close + 2.5x ATR atau TP1 + ATR
+            if atr > 0:
+                tp2 = round(close + atr * 2.5)
+            else:
+                tp2 = round(close * 1.10)
+
+            # CL (Cut Loss): support1 - ATR/2, atau close - 2x ATR
+            if s1 and atr > 0:
+                cl = round(s1 - atr * 0.5)
+            elif atr > 0:
+                cl = round(close - atr * 2)
+            else:
+                cl = round(close * 0.95)
+
+            # Hitung persentase dari close
+            tp1_pct = ((tp1 - close) / close * 100) if close > 0 else 0
+            tp2_pct = ((tp2 - close) / close * 100) if close > 0 else 0
+            cl_pct = ((cl - close) / close * 100) if close > 0 else 0
+
+            result['entry_low'] = entry_low
+            result['entry_high'] = entry_high
+            result['tp1'] = tp1
+            result['tp1_pct'] = tp1_pct
+            result['tp2'] = tp2
+            result['tp2_pct'] = tp2_pct
+            result['cl'] = cl
+            result['cl_pct'] = cl_pct
+
     logger.info(
         f"[{kode}] {emoji} {total}/100 → {label} | "
         f"D1={d1['score']:.0f} D2={d2['score']:.0f} "

@@ -142,33 +142,56 @@ async def job_update_siang(context: ContextTypes.DEFAULT_TYPE):
         await send_message(f"⚠️ Error update siang: {str(e)[:200]}", context.bot)
 
 
-async def job_sinyal_sore(context: ContextTypes.DEFAULT_TYPE):
-    """16:15 — Sinyal BSJP sore."""
-    logger.info("⏰ JOB: Sinyal Sore BSJP")
+async def job_bsjp_sore(context: ContextTypes.DEFAULT_TYPE):
+    """15:00-15:45 — BSJP pipeline: fetch fresh data, scan, broadcast."""
+    logger.info("⏰ JOB: BSJP Sore (Fetch + Scan + Broadcast)")
     try:
-        from ai.agents import run_full_analysis
-        from bot.formatter import format_sinyal_sore
-        from config.settings import TEST_STOCKS
+        from analysis.bsjp_screening import run_bsjp_screening, save_bsjp_watchlist, get_bsjp_candidates
+        from data.fetcher.stock_fetcher import fetch_and_save_batch
+        from bot.formatter import format_bsjp
 
-        # Ambil Top 5-10 dari scan market terakhir
-        rows = db.execute("SELECT kode FROM watchlist_harian ORDER BY tanggal DESC LIMIT 10")
-        if rows:
-            stocks = [r['kode'] for r in rows]
-            logger.info(f"Using {len(stocks)} stocks from watchlist_harian for sinyal sore")
-        else:
-            stocks = TEST_STOCKS
-            logger.warning("Watchlist harian kosong, menggunakan TEST_STOCKS")
-
-        result = run_full_analysis(stocks)
+        # Step 1: Fetch OHLCV fresh untuk kandidat
+        logger.info("📊 BSJP: Fetching fresh OHLCV data...")
+        candidates = get_bsjp_candidates(200)
+        fetch_and_save_batch(candidates, include_info=False)
         
-        # Kirim chart top #1 dulu
-        await send_top_chart(result, context.bot)
+        # Step 2: Quick scan BSJP
+        logger.info("🔍 BSJP: Running quick screening...")
+        results = run_bsjp_screening(candidates)
         
-        text = format_sinyal_sore(result)
+        if not results:
+            await send_message("🌆 BSJP: Tidak ada kandidat yang memenuhi kriteria hari ini.", context.bot)
+            return
+        
+        save_bsjp_watchlist(results)
+        
+        # Step 3: Broadcast chart top #1 + results
+        top_kode = results[0]['kode']
+        from utils.chart_generator import generate_advanced_chart
+        chart_path = generate_advanced_chart(top_kode, days=60)
+        if chart_path:
+            try:
+                cid = TELEGRAM_CHAT_ID
+                with open(chart_path, 'rb') as photo:
+                    await context.bot.send_photo(
+                        chat_id=cid,
+                        photo=photo,
+                        caption=f"📈 BSJP Top #1: <b>{top_kode}</b>",
+                        parse_mode='HTML'
+                    )
+            except Exception as e:
+                logger.error(f"Gagal send BSJP chart {top_kode}: {e}")
+            finally:
+                import os
+                if os.path.exists(chart_path):
+                    os.remove(chart_path)
+        
+        text = format_bsjp(results)
         await send_message(text, context.bot)
+        logger.info(f"✅ BSJP broadcast selesai: {len(results)} stocks")
     except Exception as e:
-        logger.error(f"JOB sore error: {e}")
-        await send_message(f"⚠️ Error sinyal sore: {str(e)[:200]}", context.bot)
+        logger.error(f"JOB BSJP error: {e}")
+        await send_message(f"⚠️ Error BSJP: {str(e)[:200]}", context.bot)
 
 
 async def job_fetch_ohlcv(context: ContextTypes.DEFAULT_TYPE):
@@ -239,7 +262,7 @@ async def post_init(application):
     # Senin-Jumat
     scheduler.add_job(_wrap, trigger=CronTrigger(hour=7, minute=0, day_of_week='mon-fri'), args=[job_briefing_pagi, bot], name='briefing_pagi')
     scheduler.add_job(_wrap, trigger=CronTrigger(hour=12, minute=0, day_of_week='mon-fri'), args=[job_update_siang, bot], name='update_siang')
-    scheduler.add_job(_wrap, trigger=CronTrigger(hour=16, minute=15, day_of_week='mon-fri'), args=[job_sinyal_sore, bot], name='sinyal_sore')
+    scheduler.add_job(_wrap, trigger=CronTrigger(hour=15, minute=15, day_of_week='mon-fri'), args=[job_bsjp_sore, bot], name='bsjp_sore')
     scheduler.add_job(_wrap, trigger=CronTrigger(hour=16, minute=30, day_of_week='mon-fri'), args=[job_fetch_ohlcv, bot], name='fetch_ohlcv')
 
     # Setiap 2 jam: fetch news
@@ -265,7 +288,8 @@ def build_app():
         cmd_market, cmd_portfolio, cmd_pnl, cmd_beli,
         cmd_jual, cmd_track, cmd_setting, handle_button_text,
         cmd_fetch_macro, cmd_fetch_ohlcv, cmd_fetch_fundamental, cmd_fetch_news,
-        cmd_scanner, handle_callback_query, cmd_quick_chart
+        cmd_scanner, handle_callback_query, cmd_quick_chart, cmd_quick_analisa,
+        cmd_sinyal, cmd_bsjp
     )
 
     commands = [
@@ -285,6 +309,8 @@ def build_app():
         ("fetch_fundamental", cmd_fetch_fundamental),
         ("fetch_news", cmd_fetch_news),
         ("scanner", cmd_scanner),
+        ("sinyal", cmd_sinyal),
+        ("bsjp", cmd_bsjp),
     ]
     for name, handler in commands:
         app.add_handler(CommandHandler(name, handler))
@@ -294,6 +320,9 @@ def build_app():
     
     # ── Dynamic Chart Command (/c_KODE) ──────────
     app.add_handler(MessageHandler(filters.Regex(r'^/[cC]_[a-zA-Z0-9]+'), cmd_quick_chart))
+
+    # ── Dynamic AI Analisa Command (/a_KODE) ─────
+    app.add_handler(MessageHandler(filters.Regex(r'^/[aA]_[a-zA-Z0-9]+'), cmd_quick_analisa))
 
     # ── Inline Keyboard Callback handler ────────
     app.add_handler(CallbackQueryHandler(handle_callback_query))

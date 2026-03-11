@@ -46,8 +46,8 @@ from ai.sentiment import process_unprocessed_news
 MAIN_KEYBOARD = ReplyKeyboardMarkup(
     [
         [KeyboardButton("📊 Market"), KeyboardButton("🎯 Sinyal Hari Ini")],
-        [KeyboardButton("💼 Portfolio"), KeyboardButton("📈 Track Record")],
-        [KeyboardButton("🔍 Analisa Saham"), KeyboardButton("⚙️ Setting")],
+        [KeyboardButton("🌆 BSJP Sore"), KeyboardButton("📈 Track Record")],
+        [KeyboardButton("💼 Portfolio"), KeyboardButton("⚙️ Setting")],
     ],
     resize_keyboard=True,
     is_persistent=True,
@@ -93,6 +93,8 @@ async def handle_button_text(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 ],
             ]),
         )
+    elif text == "🌆 BSJP Sore":
+        await cmd_bsjp(update, context)
     elif text == "⚙️ Setting":
         await cmd_setting(update, context)
     else:
@@ -183,11 +185,18 @@ async def cmd_sinyal(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         for i, r in enumerate(results, 1):
             e = r.get('emoji', '❓')
-            lines.append(
-                f"{rank_emoji.get(i, str(i)+'.')} <b>{r['kode']}</b> {e} {r['label']} ({r['total']:.1f} pt) | /c_{r['kode']}"
-            )
+            close = r.get('close', 0)
+            line = f"{rank_emoji.get(i, str(i)+'.')} <b>{r['kode']}</b> {e} {r['label']} ({r['total']:.1f} pt) | /c_{r['kode']}"
+            line += f"\n   💰 Harga: Rp {close:,.0f}"
+            
+            if r.get('entry_low'):
+                line += f"\n   📈 Entry: Rp {r['entry_low']:,.0f} - {r['entry_high']:,.0f}"
+                line += f"\n   🎯 TP1: Rp {r['tp1']:,.0f} ({r['tp1_pct']:+.1f}%) | TP2: Rp {r['tp2']:,.0f} ({r['tp2_pct']:+.1f}%)"
+                line += f"\n   🛡️ CL: Rp {r['cl']:,.0f} ({r['cl_pct']:+.1f}%)"
+            
+            lines.append(line)
 
-        lines.append("\n💡 Klik tulisan biru (misal /c_BBCA) untuk lihat Chart & Analisa")
+        lines.append("\n💡 /c_KODE = Chart | /a_KODE = Analisa AI")
         text = "\n".join(lines)
 
         top_kode = results[0]['kode'] if results else None
@@ -217,12 +226,105 @@ async def cmd_sinyal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Error: {str(e)[:100]}", reply_markup=MAIN_KEYBOARD)
 
 
+async def cmd_bsjp(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """BSJP (Beli Sore Jual Pagi) — Quick screening for overnight trades."""
+    await update.message.reply_text(
+        "🌆 <b>Scanning BSJP...</b>\n⏳ Menganalisa 100-200 kandidat (3-8 menit)",
+        parse_mode='HTML', reply_markup=MAIN_KEYBOARD
+    )
+
+    try:
+        from analysis.bsjp_screening import run_bsjp_screening, save_bsjp_watchlist
+        from bot.formatter import format_bsjp
+
+        results = run_bsjp_screening()
+        
+        if not results:
+            await update.message.reply_text(
+                "❌ Tidak ada kandidat BSJP yang memenuhi kriteria hari ini.",
+                reply_markup=MAIN_KEYBOARD
+            )
+            return
+
+        save_bsjp_watchlist(results)
+
+        # Kirim chart top #1
+        top_kode = results[0]['kode']
+        from utils.chart_generator import generate_advanced_chart
+        chart_path = generate_advanced_chart(top_kode, days=60)
+        if chart_path:
+            try:
+                with open(chart_path, 'rb') as photo:
+                    await context.bot.send_photo(
+                        chat_id=update.effective_chat.id,
+                        photo=photo,
+                        caption=f"📈 BSJP Top #1: <b>{top_kode}</b>",
+                        parse_mode="HTML"
+                    )
+            except Exception as e:
+                logger.error(f"Gagal mengirim chart BSJP {top_kode}: {e}")
+            finally:
+                import os
+                if os.path.exists(chart_path):
+                    os.remove(chart_path)
+
+        text = format_bsjp(results)
+        await update.message.reply_text(text, parse_mode='HTML', reply_markup=MAIN_KEYBOARD)
+    except Exception as e:
+        logger.error(f"Error BSJP: {e}")
+        await update.message.reply_text(f"❌ Error BSJP: {str(e)[:100]}", reply_markup=MAIN_KEYBOARD)
+
 async def cmd_quick_chart(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler untuk command dinamis /c_KODE -> redirect ke /analisa KODE"""
+    """Handler untuk /c_KODE -> kirim GAMBAR CHART saja (tanpa AI analysis)."""
     text = update.message.text
     if "@" in text:
         text = text.split("@")[0]
     kode = text.replace("/c_", "", 1).replace("/C_", "", 1).upper()
+    
+    if not kode:
+        return
+
+    await update.message.reply_text(f"📈 Generating chart <b>{kode}</b>...", parse_mode='HTML')
+    
+    try:
+        from utils.chart_generator import generate_advanced_chart
+        chart_path = generate_advanced_chart(kode, days=150)
+        if chart_path:
+            try:
+                with open(chart_path, 'rb') as photo:
+                    await context.bot.send_photo(
+                        chat_id=update.effective_chat.id,
+                        photo=photo,
+                        caption=(
+                            f"📈 <b>{kode}</b> — Chart Teknikal\n"
+                            f"Indikator: EMA 20/50, BBands, MACD, StochRSI\n\n"
+                            f"💡 Ketik /a_{kode} untuk analisa AI lengkap"
+                        ),
+                        parse_mode="HTML"
+                    )
+            except Exception as e:
+                logger.error(f"Gagal mengirim chart {kode}: {e}")
+                await update.message.reply_text(f"❌ Gagal mengirim chart {kode}", reply_markup=MAIN_KEYBOARD)
+            finally:
+                import os
+                if os.path.exists(chart_path):
+                    os.remove(chart_path)
+        else:
+            await update.message.reply_text(
+                f"❌ Data chart <b>{kode}</b> tidak tersedia. Pastikan kode saham benar.",
+                parse_mode='HTML', reply_markup=MAIN_KEYBOARD
+            )
+    except Exception as e:
+        logger.error(f"Error quick chart {kode}: {e}")
+        await update.message.reply_text(f"❌ Error: {str(e)[:100]}", reply_markup=MAIN_KEYBOARD)
+
+
+async def cmd_quick_analisa(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk /a_KODE -> redirect ke /analisa KODE (5 Agent AI lengkap)."""
+    text = update.message.text
+    if "@" in text:
+        text = text.split("@")[0]
+    kode = text.replace("/a_", "", 1).replace("/A_", "", 1).upper()
     
     if not kode:
         return
