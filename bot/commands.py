@@ -794,3 +794,28 @@ async def cmd_scanner(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"Error scanner: {e}")
         await update.message.reply_text(f"❌ Error scanner: {str(e)[:100]}")
+
+async def cmd_performance_check(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler Cek Performa AI (Fase 13)"""
+    try:
+        from analysis.performance import get_ai_performance
+        from bot.formatter import format_ai_performance
+        
+        msg = await update.message.reply_text("⏳ Menghitung statistik win-rate AI 1-30 hari...", reply_markup=SINYAL_KEYBOARD)
+        
+        # Hitung untuk 1, 3, 7, 30 hari
+        data_1d = get_ai_performance(1)
+        data_3d = get_ai_performance(3)
+        data_7d = get_ai_performance(7)
+        data_30d = get_ai_performance(30)
+        
+        text = format_ai_performance([data_1d, data_3d, data_7d, data_30d])
+        
+        try:
+            await msg.delete()
+        except:
+            pass
+        await update.message.reply_text(text, parse_mode='HTML', reply_markup=SINYAL_KEYBOARD)
+    except Exception as e:
+        logger.error(f"Error cmd_performance_check: {e}")
+        await update.message.reply_text(f"❌ Error: {str(e)[:100]}", reply_markup=SINYAL_KEYBOARD)
