@@ -234,10 +234,19 @@ async def cmd_bsjp(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     try:
-        from analysis.bsjp_screening import run_bsjp_screening, save_bsjp_watchlist
+        from analysis.bsjp_screening import run_bsjp_screening, save_bsjp_watchlist, get_bsjp_candidates
+        from data.fetcher.stock_fetcher import fetch_and_save_batch
         from bot.formatter import format_bsjp
 
-        results = run_bsjp_screening()
+        # Step 1: Ambil daftar kandidat
+        candidates = get_bsjp_candidates(200)
+
+        # Step 2: Download data OHLCV FRESH hari ini (bukan data kemarin)
+        logger.info(f"BSJP: Fetching fresh OHLCV for {len(candidates)} candidates...")
+        fetch_and_save_batch(candidates, include_info=False)
+
+        # Step 3: Scan dengan data fresh
+        results = run_bsjp_screening(candidates)
         
         if not results:
             await update.message.reply_text(
