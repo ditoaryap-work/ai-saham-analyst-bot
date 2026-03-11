@@ -126,6 +126,55 @@ async def job_briefing_pagi(context: ContextTypes.DEFAULT_TYPE):
         await send_message(f"⚠️ Error briefing pagi: {str(e)[:200]}", context.bot)
 
 
+async def job_swing_pagi(context: ContextTypes.DEFAULT_TYPE):
+    """07:30 Senin — Swing Trade screening mingguan."""
+    logger.info("⏰ JOB: Swing Trade Mingguan (Senin Pagi)")
+    try:
+        from analysis.swing_screening import run_swing_screening, save_swing_watchlist, get_swing_candidates
+        from data.fetcher.stock_fetcher import fetch_and_save_batch
+        from bot.formatter import format_swing
+
+        logger.info("🌊 Swing: Fetching fresh OHLCV data...")
+        candidates = get_swing_candidates(150)
+        fetch_and_save_batch(candidates, include_info=False)
+        
+        logger.info("🔍 Swing: Running screening...")
+        results = run_swing_screening(candidates)
+        
+        if not results:
+            await send_message("🌊 Swing: Tidak ada setup swing kuat minggu ini.", context.bot)
+            return
+            
+        save_swing_watchlist(results)
+        
+        # Broadcast chart top #1
+        top_kode = results[0]['kode']
+        from utils.chart_generator import generate_advanced_chart
+        chart_path = generate_advanced_chart(top_kode, days=150)
+        if chart_path:
+            try:
+                with open(chart_path, 'rb') as photo:
+                    await context.bot.send_photo(
+                        chat_id=TELEGRAM_CHAT_ID,
+                        photo=photo,
+                        caption=f"📈 Swing Top #1: <b>{top_kode}</b>",
+                        parse_mode='HTML'
+                    )
+            except Exception as e:
+                logger.error(f"Gagal send Swing chart {top_kode}: {e}")
+            finally:
+                import os
+                if os.path.exists(chart_path):
+                    os.remove(chart_path)
+                    
+        text = format_swing(results)
+        await send_message(text, context.bot)
+        logger.info(f"✅ Swing broadcast selesai: {len(results)} stocks")
+    except Exception as e:
+        logger.error(f"JOB Swing error: {e}")
+        await send_message(f"⚠️ Error Swing: {str(e)[:200]}", context.bot)
+
+
 async def job_update_siang(context: ContextTypes.DEFAULT_TYPE):
     """12:00 — Evaluasi/alert portfolio di jam istirahat."""
     logger.info("⏰ JOB: Update Siang (Cek Sinyal Pagi)")
