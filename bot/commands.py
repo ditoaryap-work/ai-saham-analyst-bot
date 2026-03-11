@@ -226,6 +226,29 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.callback_query.message.reply_text(text, parse_mode='HTML', reply_markup=MAIN_KEYBOARD)
 
 
+async def _send_top_chart(result: dict, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Kirim chart teknikal otomatis untuk saham #1 direkomendasikan."""
+    try:
+        from loguru import logger
+        if not result or 'ranking' not in result or not result['ranking']:
+            return
+            
+        top_kode = result['ranking'][0]['kode']
+        from analysis.charts import generate_chart
+        
+        chart_path = generate_chart(top_kode)
+        if chart_path:
+            with open(chart_path, 'rb') as f:
+                await update.message.reply_photo(
+                    photo=f, 
+                    caption=f"📈 <b>{top_kode}</b> - Top #1 Sinyal Pagi Ini", 
+                    parse_mode='HTML'
+                )
+    except Exception as e:
+        from loguru import logger
+        logger.error(f"Error _send_top_chart: {e}")
+
+
 async def cmd_sinyal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Sinyal hari ini (diambil dari watchlist_harian hasil scanner)."""
     await update.message.reply_text("🎯 Mengambil rekomendasi Top 10 hari ini...", reply_markup=MAIN_KEYBOARD)
