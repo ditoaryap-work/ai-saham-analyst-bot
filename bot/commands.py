@@ -500,22 +500,35 @@ async def cmd_bandingkan(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_market(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Kondisi pasar."""
+    """Kondisi pasar mengunduh data terbaru secara real-time."""
+    message = await update.message.reply_text(
+        "⏳ <b>Mengambil data pasar terbaru...</b>\nMohon tunggu beberapa detik.",
+        parse_mode='HTML', reply_markup=MAIN_KEYBOARD
+    )
+    
     try:
-        macro = db.execute("SELECT * FROM makro_data ORDER BY tanggal DESC LIMIT 1")
-        if not macro:
-            await update.message.reply_text(
-                "❌ Data makro belum tersedia.\nJalankan fetch dulu.", reply_markup=MAIN_KEYBOARD)
+        from data.fetcher.macro_fetcher import fetch_and_save_macro
+        from datetime import datetime
+        import pytz
+
+        # Ambil data terbaru langsung dari internet
+        logger.info("Market Command: Fetching fresh macro data...")
+        m = fetch_and_save_macro()
+        
+        if not m:
+            await message.edit_text("❌ Gagal mengunduh data makro.")
             return
 
-        m = dict(macro[0])
         label = m.get('market_label', 'UNKNOWN')
         emoji_map = {'BULLISH': '🟢', 'MIXED': '🟡', 'BEARISH': '🔴', 'EXTREME': '⚫'}
+        
+        tz = pytz.timezone('Asia/Jakarta')
+        now = datetime.now(tz).strftime('%d %b %Y | %H:%M WIB')
 
         text = (
-            f"📊 *KONDISI PASAR*\n"
-            f"📅 {m.get('tanggal', '-')}\n\n"
-            f"{emoji_map.get(label, '❓')} *{label}*\n\n"
+            f"📊 <b>KONDISI PASAR SAAT INI</b>\n"
+            f"🕒 {now}\n\n"
+            f"{emoji_map.get(label, '❓')} <b>{label}</b>\n\n"
             f"IHSG      : {m.get('ihsg_change', 0):+.2%}\n"
             f"Nikkei    : {m.get('nikkei_change', 0):+.2%}\n"
             f"Hang Seng : {m.get('hsi_change', 0):+.2%}\n"
@@ -523,9 +536,10 @@ async def cmd_market(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Gold      : {m.get('gold_change', 0):+.2%}\n"
             f"Oil       : {m.get('oil_change', 0):+.2%}"
         )
-        await update.message.reply_text(text, parse_mode='HTML', reply_markup=MAIN_KEYBOARD)
+        await message.edit_text(text, parse_mode='HTML')
     except Exception as e:
-        await update.message.reply_text(f"❌ Error: {str(e)[:100]}", reply_markup=MAIN_KEYBOARD)
+        logger.error(f"Error cmd_market: {e}")
+        await message.edit_text(f"❌ Error: {str(e)[:100]}")
 
 
 async def cmd_portfolio(update: Update, context: ContextTypes.DEFAULT_TYPE):
