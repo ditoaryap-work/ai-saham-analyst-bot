@@ -26,7 +26,7 @@ from analysis.technical import calculate_indicators
 from analysis.scoring import calculate_composite_score, format_score_report
 from portfolio.tracker import (
     buy_position, sell_position, get_portfolio_summary,
-    check_alerts, get_track_record,
+    check_alerts, get_track_record, get_modal_awal, set_modal_awal,
 )
 from bot.formatter import (
     format_analisa, format_portfolio, format_track_record,
