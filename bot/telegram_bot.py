@@ -33,6 +33,9 @@ from bot.commands import (
     cmd_start, cmd_help, cmd_analisa, cmd_bandingkan,
     cmd_market, cmd_portfolio, cmd_pnl, cmd_beli,
     cmd_jual, cmd_track, cmd_setting, handle_button_text,
+    cmd_fetch_macro, cmd_fetch_ohlcv, cmd_fetch_fundamental, cmd_fetch_news,
+    cmd_scanner, handle_callback_query, cmd_quick_chart, cmd_quick_analisa,
+    cmd_sinyal, cmd_bsjp, cmd_swing, cmd_performance_check, cmd_setmodal
 )
 
 
@@ -418,14 +421,6 @@ def build_app():
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).post_init(post_init).build()
 
     # ── Command handlers ────────────────────
-    from bot.commands import (
-        cmd_start, cmd_help, cmd_analisa, cmd_bandingkan,
-        cmd_market, cmd_portfolio, cmd_pnl, cmd_beli,
-        cmd_jual, cmd_track, cmd_setting, handle_button_text,
-        cmd_fetch_macro, cmd_fetch_ohlcv, cmd_fetch_fundamental, cmd_fetch_news,
-        cmd_scanner, handle_callback_query, cmd_quick_chart, cmd_quick_analisa,
-        cmd_sinyal, cmd_bsjp, cmd_swing, cmd_performance_check
-    )
 
     commands = [
         ("start", cmd_start),
