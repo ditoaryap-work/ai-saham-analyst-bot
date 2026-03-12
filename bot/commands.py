@@ -30,6 +30,7 @@ from portfolio.tracker import (
 )
 from bot.formatter import (
     format_analisa, format_portfolio, format_track_record,
+    format_briefing_pagi,
 )
 
 # ── Import Fetchers untuk Admin Commands ──
