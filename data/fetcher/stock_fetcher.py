@@ -249,7 +249,28 @@ def fetch_all_idx_tickers() -> list:
     except Exception as e:
         logger.error(f"Error fetch_all_idx_tickers: {e}")
         return []
-
+def get_all_stock_codes() -> list:
+    """
+    Ambil seluruh daftar kode emiten aktif.
+    Prioritas:
+    1. Dari tabel daftar_emiten di DB.
+    2. Jika DB kosong, fetch ulang dari IDX.
+    """
+    logger.info("Mengambil daftar seluruh kode emiten...")
+    try:
+        rows = db.execute("SELECT kode FROM daftar_emiten")
+        if rows:
+            codes = [r['kode'] for r in rows]
+            logger.info(f"Ditemukan {len(codes)} kode di database.")
+            return codes
+        
+        # Jika DB kosong, fetch dari scratch
+        logger.warning("Tabel daftar_emiten kosong. Mendownload ulang dari IDX...")
+        codes = fetch_all_idx_tickers()
+        return codes
+    except Exception as e:
+        logger.error(f"Error get_all_stock_codes: {e}")
+        return TEST_STOCKS  # Fallback ke test stocks jika total error
 
 # ── Entry point untuk testing ────────────────────────
 if __name__ == "__main__":
