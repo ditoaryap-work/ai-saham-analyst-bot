@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from data.database import db
-from ai.agents import _call_ai
+from ai.llm import _call_ai
 
 def get_recent_performance_data(days: int = 7):
     """
