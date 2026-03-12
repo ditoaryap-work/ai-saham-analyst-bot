@@ -19,7 +19,8 @@ from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboard
 from telegram.ext import ContextTypes
 from loguru import logger
 
-from config.settings import MODAL_AWAL, MAX_POSISI, TEST_STOCKS
+# ── Config & Constants ──
+from config.settings import MAX_POSISI, TEST_STOCKS
 from data.database import db
 from analysis.technical import calculate_indicators
 from analysis.scoring import calculate_composite_score, format_score_report
@@ -430,13 +431,9 @@ async def cmd_quick_chart(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     caption += f"─────────────────────\n"
 
                 if score_data.get('label') == 'SKIP':
-                    caption += (
-                        f"[ Harga  ] Rp {score_data.get('close', 0):,.0f}\n\n"
-                        f"⚠️ <b>JANGAN DIBELI</b>\n"
-                        f"Saham ini masuk kategori SKIP karena skor teknikal/fundamental yang kurang memadai. Sangat berisiko.\n"
-                        f"─────────────────────\n"
-                    )
-                elif score_data.get('entry_low'):
+                    caption += f"⚠️ <b>STATUS SKIP - SANGAT BERISIKO</b>\n─────────────────────\n"
+                    
+                if score_data.get('entry_low'):
                     tp1 = score_data.get('tp1', 0)
                     tp2 = score_data.get('tp2', 0)
                     sl = score_data.get('cl', 0)
@@ -448,6 +445,7 @@ async def cmd_quick_chart(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         f"[ SL     ] Rp {sl:,.0f} ({score_data.get('cl_pct', 0):+.1f}%)\n"
                         f"─────────────────────\n"
                     )
+
                 
                 caption += f"💡 Ketik /a_{kode} untuk analisa AI lengkap"
 
@@ -746,17 +744,40 @@ async def cmd_track(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_setting(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Lihat setting."""
+    modal = get_modal_awal()
     text = (
         f"⚙️ *SETTING*\n\n"
-        f"Modal awal  : Rp {MODAL_AWAL:,.0f}\n"
+        f"Modal awal  : Rp {modal:,.0f}\n"
         f"Max posisi  : {MAX_POSISI}\n"
         f"Test stocks : {', '.join(TEST_STOCKS)}\n\n"
-        f"_Ubah via file .env dan restart bot._"
+        f"_Ubah modal dengan perintah /setmodal <angka>._"
     )
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("📖 Baca Panduan Lengkap (/help)", callback_data="help")]
     ])
     await update.message.reply_text(text, parse_mode='HTML', reply_markup=keyboard)
+
+
+async def cmd_setmodal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Set modal awal portofolio."""
+    try:
+        args = context.args
+        if not args:
+            await update.message.reply_text("⚠️ Format: /setmodal 5000000", reply_markup=MAIN_KEYBOARD)
+            return
+            
+        nominal = float(args[0].replace('.', '').replace(',', ''))
+        if nominal < 100000:
+            await update.message.reply_text("⚠️ Modal minimal Rp 100.000", reply_markup=MAIN_KEYBOARD)
+            return
+            
+        set_modal_awal(nominal)
+        await update.message.reply_text(f"✅ Modal berhasil diubah menjadi: Rp {nominal:,.0f}", reply_markup=MAIN_KEYBOARD)
+    except ValueError:
+        await update.message.reply_text("⚠️ Nominal harus berupa angka valid.", reply_markup=MAIN_KEYBOARD)
+    except Exception as e:
+        logger.error(f"Error setmodal: {e}")
+        await update.message.reply_text(f"❌ Error: {str(e)[:100]}", reply_markup=MAIN_KEYBOARD)
 
 
 async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):

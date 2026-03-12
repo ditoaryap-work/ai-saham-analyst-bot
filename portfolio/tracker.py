@@ -19,7 +19,43 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from data.database import db
-from config.settings import MODAL_AWAL, MAX_POSISI, MAX_PER_SAHAM_PCT
+from config.settings import MAX_POSISI, MAX_PER_SAHAM_PCT
+from config.settings import MODAL_AWAL as ENV_MODAL_AWAL
+
+
+def get_modal_awal() -> float:
+    """Ambil modal_awal dari database, fallback ke .env"""
+    row = db.execute("SELECT modal_awal FROM portfolio_config WHERE user_id = 'default'")
+    if row and row[0]['modal_awal']:
+        return float(row[0]['modal_awal'])
+    return ENV_MODAL_AWAL
+
+
+def set_modal_awal(amount: float) -> bool:
+    """Update modal_awal dan asimulasikan cash berdasarkan selisih deposit/withdraw."""
+    old_modal = get_modal_awal()
+    diff = amount - old_modal
+    
+    # Update config
+    db.execute(
+        "INSERT INTO portfolio_config (user_id, modal_awal, max_posisi, max_per_saham_pct) "
+        "VALUES ('default', ?, ?, ?) "
+        "ON CONFLICT(user_id) DO UPDATE SET modal_awal = excluded.modal_awal",
+        (amount, MAX_POSISI, MAX_PER_SAHAM_PCT)
+    )
+    
+    # Adjust last cash snapshot
+    row = db.execute("SELECT cash FROM dana_snapshot ORDER BY tanggal DESC LIMIT 1")
+    if row:
+        current_cash = float(row[0]['cash'])
+        new_cash = max(0, current_cash + diff)
+        db.execute(
+            "UPDATE dana_snapshot SET cash = ? WHERE tanggal = (SELECT tanggal FROM dana_snapshot ORDER BY tanggal DESC LIMIT 1)",
+            (new_cash,)
+        )
+    
+    _update_snapshot()
+    return True
 
 
 def _get_cash() -> float:
@@ -27,7 +63,7 @@ def _get_cash() -> float:
     row = db.execute("SELECT cash FROM dana_snapshot ORDER BY tanggal DESC LIMIT 1")
     if row:
         return dict(row[0])['cash']
-    return MODAL_AWAL
+    return get_modal_awal()
 
 
 def _update_snapshot():
@@ -39,7 +75,8 @@ def _update_snapshot():
     invested = dict(positions[0])['invested'] if positions and dict(positions[0])['invested'] else 0
 
     total = cash + invested
-    return_pct = (total - MODAL_AWAL) / MODAL_AWAL if MODAL_AWAL > 0 else 0
+    modal = get_modal_awal()
+    return_pct = (total - modal) / modal if modal > 0 else 0
 
     db.execute(
         """INSERT OR REPLACE INTO dana_snapshot (tanggal, total_portfolio, cash, invested, return_pct)
@@ -69,7 +106,8 @@ def buy_position(kode: str, lot: int, harga: float, stoploss: float = None,
         return {'success': False, 'error': f'Max posisi ({MAX_POSISI}) sudah tercapai'}
 
     # Validasi max per saham
-    max_alloc = MODAL_AWAL * MAX_PER_SAHAM_PCT
+    modal = get_modal_awal()
+    max_alloc = modal * MAX_PER_SAHAM_PCT
     if cost > max_alloc:
         return {'success': False, 'error': f'Melebihi max alokasi per saham (Rp {max_alloc:,.0f})'}
 
@@ -86,7 +124,7 @@ def buy_position(kode: str, lot: int, harga: float, stoploss: float = None,
     db.execute(
         "INSERT OR REPLACE INTO dana_snapshot (tanggal, total_portfolio, cash, invested, return_pct) "
         "VALUES (?, ?, ?, ?, ?)",
-        (date.today().isoformat(), MODAL_AWAL, new_cash, cost, 0),
+        (date.today().isoformat(), modal, new_cash, cost, 0),
     )
 
     _update_snapshot()
@@ -251,13 +289,14 @@ def check_alerts() -> list:
                 'message': f"🔴 {pos['kode']} floating loss {pos['unrealized_pct']:+.1%}. Review posisi.",
             })
 
-    # Cash idle check (>40% modal)
-    if summary['cash'] > MODAL_AWAL * 0.4 and summary['n_positions'] > 0:
+    # Cash idle check
+    modal = get_modal_awal()
+    if summary['cash'] > modal * 0.4 and summary['n_positions'] > 0:
         alerts.append({
             'type': 'CASH_IDLE',
-            'message': f"💰 Cash idle tinggi: Rp {summary['cash']:,.0f} ({summary['cash']/MODAL_AWAL:.0%} dari modal). Pertimbangkan deploy.",
+            'message': f"💰 Cash idle tinggi: Rp {summary['cash']:,.0f} ({summary['cash']/modal:.0%} dari modal). Pertimbangkan deploy.",
+            'kode': '-'
         })
-
     return alerts
 
 

@@ -414,10 +414,11 @@ def format_analisa(kode: str, data: dict) -> str:
     if label == 'SKIP':
         lines.extend([
             "",
-            "⚠️ <b>JANGAN DIBELI</b>",
-            "Sistem AI memutuskan untuk SKIP saham ini karena risiko tinggi atau tidak sesuai kriteria.",
+            "⚠️ <b>JANGAN DIBELI - SANGAT BERISIKO</b>",
+            "Sistem AI menyarankan SKIP pada saham ini, Trade Plan di bawah hanya untuk referensi pengamatan.",
         ])
-    elif final.get('entry_low'):
+        
+    if final.get('entry_low'):
         lines.extend([
             "",
             "🎯 SIGNAL:",

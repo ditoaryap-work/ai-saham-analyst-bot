@@ -346,6 +346,27 @@ async def job_auto_alert(context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"JOB auto alert error: {e}")
 
+async def job_weekly_reflection(context: ContextTypes.DEFAULT_TYPE):
+    """Minggu 09:00 — AI melakukan evaluasi diri dan generate pedoman baru."""
+    logger.info("⏰ JOB: Weekly Reflection (AI Self-Learning)")
+    try:
+        from analysis.reflection import run_weekly_reflection
+        lessons = run_weekly_reflection()
+        if lessons:
+            text = (
+                "🧠 <b>AI WEEKLY REFLECTION</b>\n"
+                "<i>Self-Learning Loop Activated</i>\n"
+                "─────────────────────\n\n"
+                f"{lessons}\n\n"
+                "💡 <i>Pedoman ini akan otomatis disuntikkan ke analisa AI minggu depan.</i>"
+            )
+            await send_message(text, context.bot)
+        else:
+            logger.info("Weekly reflection tidak menghasilkan lessons baru.")
+    except Exception as e:
+        logger.error(f"JOB Weekly Reflection error: {e}")
+
+
 # ═══════════════════════════════════════════════════════
 # BUILD APPLICATION
 # ═══════════════════════════════════════════════════════
@@ -382,6 +403,9 @@ async def post_init(application):
     # Setiap hari: fundamental & Full Market Scan jam 21:00 - 22:00
     scheduler.add_job(_wrap, trigger=CronTrigger(hour=21, minute=0, day_of_week='mon-fri'), args=[job_full_market_scan, bot], name='full_market_scan')
     scheduler.add_job(_wrap, trigger=CronTrigger(hour=22, minute=0), args=[job_fetch_fundamental, bot], name='fetch_fundamental')
+
+    # Weekly Reflection (Minggu 09:00)
+    scheduler.add_job(_wrap, trigger=CronTrigger(hour=9, minute=0, day_of_week='sun'), args=[job_weekly_reflection, bot], name='weekly_reflection')
 
     scheduler.start()
     logger.info(f"⏰ Scheduler started ({len(scheduler.get_jobs())} jobs)")
@@ -424,6 +448,7 @@ def build_app():
         ("bsjp", cmd_bsjp),
         ("swing", cmd_swing),
         ("performa", cmd_performance_check),
+        ("setmodal", cmd_setmodal),
     ]
     for name, handler in commands:
         app.add_handler(CommandHandler(name, handler))

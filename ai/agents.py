@@ -28,6 +28,7 @@ from ai.prompts import BRIEFING_PROMPT, SIGNAL_PROMPT, RISK_PROMPT
 from ai.sentiment import process_unprocessed_news, get_sentiment_summary
 from analysis.technical import calculate_indicators, get_technical_summary
 from analysis.scoring import calculate_composite_score, format_score_report, format_table_for_ai
+from analysis.reflection import get_latest_guidelines
 
 
 client = OpenAI(
@@ -284,9 +285,13 @@ def agent5_risk_manager(kode: str, all_results: dict) -> dict:
     score = all_results.get('score', {})
     market = all_results.get('market', {})
 
+    # Injeksi pedoman belajar AI (Self-Learning)
+    guidelines = get_latest_guidelines()
+    guideline_text = f"\n[PENTING - PEDOMAN HASIL BELAJAR SEBELUMNYA]:\n{guidelines}\n" if guidelines else ""
+
     data = f"""Kode: {kode}
 Market: {market.get('market_label', 'UNKNOWN')}
-
+{guideline_text}
 Scoring: {format_table_for_ai(score)}
 
 Technical Verdict: {tech.get('technical_verdict', 'N/A')}
