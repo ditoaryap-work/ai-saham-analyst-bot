@@ -421,7 +421,22 @@ async def cmd_quick_chart(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"─────────────────────\n"
                 )
                 
-                if score_data.get('entry_low'):
+                # Tambahkan insight cepat (mini reasoning) - Fitur Pintar
+                tech_details = score_data.get('d1_technical', {}).get('details', [])
+                if tech_details:
+                    caption += f"📌 <b>Insight Cepat:</b> {tech_details[0]}\n"
+                    if len(tech_details) > 1:
+                        caption += f"   • {tech_details[1]}\n"
+                    caption += f"─────────────────────\n"
+
+                if score_data.get('label') == 'SKIP':
+                    caption += (
+                        f"[ Harga  ] Rp {score_data.get('close', 0):,.0f}\n\n"
+                        f"⚠️ <b>JANGAN DIBELI</b>\n"
+                        f"Saham ini masuk kategori SKIP karena skor teknikal/fundamental yang kurang memadai. Sangat berisiko.\n"
+                        f"─────────────────────\n"
+                    )
+                elif score_data.get('entry_low'):
                     tp1 = score_data.get('tp1', 0)
                     tp2 = score_data.get('tp2', 0)
                     sl = score_data.get('cl', 0)

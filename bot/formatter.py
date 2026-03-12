@@ -411,7 +411,13 @@ def format_analisa(kode: str, data: dict) -> str:
         for arg in debate['bear_arguments'][:3]:
             lines.append(f"      • {arg[:100]}")
 
-    if final.get('entry_low'):
+    if label == 'SKIP':
+        lines.extend([
+            "",
+            "⚠️ <b>JANGAN DIBELI</b>",
+            "Sistem AI memutuskan untuk SKIP saham ini karena risiko tinggi atau tidak sesuai kriteria.",
+        ])
+    elif final.get('entry_low'):
         lines.extend([
             "",
             "🎯 SIGNAL:",
