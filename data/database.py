@@ -245,8 +245,16 @@ class Database:
                     skor_l2 REAL,
                     skor_l3 REAL,
                     total_composite REAL,
-                    last_update DATETIME,
                     PRIMARY KEY (tanggal, kode)
+                )
+            """)
+
+            # ─── Tabel 13: ai_guidelines ─────────────────
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS ai_guidelines (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tanggal DATE,
+                    guidelines TEXT
                 )
             """)
 
@@ -264,7 +272,7 @@ class Database:
                 ON fundamental(kode)
             """)
 
-            logger.info("✅ Semua 11 tabel berhasil dibuat/diverifikasi.")
+            logger.info("✅ Semua 13 tabel berhasil dibuat/diverifikasi.")
 
     # ── Portfolio Config CRUD ─────────────────────────
     def get_portfolio_config(self, user_id: str = "default") -> dict:

@@ -139,9 +139,13 @@ def run_weekly_reflection():
 
 def get_latest_guidelines():
     """Ambil pedoman terbaru untuk disuntikkan ke prompt."""
-    row = db.execute("SELECT guidelines FROM ai_guidelines ORDER BY tanggal DESC LIMIT 1")
-    if row:
-        return row[0]['guidelines']
+    try:
+        row = db.execute("SELECT guidelines FROM ai_guidelines ORDER BY tanggal DESC LIMIT 1")
+        if row:
+            return row[0]['guidelines']
+    except:
+        # Jika tabel belum ada, buat langsung
+        db.execute("CREATE TABLE IF NOT EXISTS ai_guidelines (id INTEGER PRIMARY KEY AUTOINCREMENT, tanggal DATE, guidelines TEXT)")
     return None
 
 if __name__ == "__main__":

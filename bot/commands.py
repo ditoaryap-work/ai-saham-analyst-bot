@@ -252,7 +252,7 @@ async def _send_top_chart(result: dict, update: Update, context: ContextTypes.DE
 
 async def cmd_sinyal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Sinyal hari ini (diambil dari watchlist_harian hasil scanner)."""
-    await update.message.reply_text("🎯 Mengambil rekomendasi Top 10 hari ini...", reply_markup=MAIN_KEYBOARD)
+    msg = await update.message.reply_text("🎯 Mengambil rekomendasi Top 10 hari ini...", reply_markup=MAIN_KEYBOARD)
 
     try:
         from ai.agents import run_full_analysis
@@ -388,6 +388,10 @@ async def cmd_swing(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     os.remove(chart_path)
 
         text = format_swing(results)
+        try:
+            await msg.delete()
+        except:
+            pass
         await update.message.reply_text(text, parse_mode='HTML', reply_markup=MAIN_KEYBOARD)
     except Exception as e:
         logger.error(f"Error Swing: {e}")
@@ -870,7 +874,12 @@ async def cmd_performance_check(update: Update, context: ContextTypes.DEFAULT_TY
         data_7d = get_ai_performance(7)
         data_30d = get_ai_performance(30)
         
-        text = format_ai_performance([data_1d, data_3d, data_7d, data_30d])
+        text = format_ai_performance({
+            '1 Hari': data_1d,
+            '3 Hari': data_3d,
+            '7 Hari': data_7d,
+            '30 Hari': data_30d
+        })
         
         try:
             await msg.delete()
