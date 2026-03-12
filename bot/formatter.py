@@ -477,3 +477,32 @@ def format_track_record(track: dict) -> str:
         lines.append("\nBelum ada trade yang tercatat.")
 
     return "\n".join(lines)
+
+
+def format_ai_performance(data: dict) -> str:
+    """Format AI Performance check result."""
+    lines = [
+        "<b>📈 PERFORMA AI (WIN RATE)</b>",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+    ]
+    
+    for period, stats in data.items():
+        if isinstance(stats, dict):
+            win_rate = stats.get('win_rate', 0)
+            total = stats.get('total', 0)
+            active = stats.get('active', 0)
+            closed = total - active
+            
+            lines.append(f"<b>• Periode {period}</b>")
+            if closed > 0:
+                lines.append(f"  Win Rate : {win_rate:.0%} ({stats.get('hit_tp1', 0) + stats.get('hit_tp2', 0)}/{closed} closed)")
+            else:
+                lines.append("  Win Rate : - (Belum ada yg closed)")
+            lines.append(f"  TP1 Hit  : {stats.get('hit_tp1', 0)}x")
+            lines.append(f"  TP2 Hit  : {stats.get('hit_tp2', 0)}x")
+            lines.append(f"  SL Hit   : {stats.get('hit_sl', 0)}x")
+            lines.append(f"  Status   : {active} masih hold dari {total} total sinyal")
+            lines.append("")
+            
+    lines.append("<i>*Hanya menghitung sinyal yang sudah menyentuh target harga / stoploss.</i>")
+    return "\n".join(lines)
